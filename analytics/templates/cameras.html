@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Камеры — {{ branding.product_name }}{% endblock %}
+
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-camera-video"></i> Камеры аналитики</h4>
+
+<div class="row g-3">
+    {% for s in statuses %}
+    <div class="col-md-6 col-xl-4">
+        <div class="card bg-black border-secondary h-100">
+            <img src="{{ url_for('preview', camera_id=s.id) }}"
+                 class="card-img-top"
+                 style="aspect-ratio: 16/9; object-fit: cover;"
+                 onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 60%22><rect fill=%22%23222%22 width=%22100%22 height=%2260%22/><text x=%2250%22 y=%2233%22 fill=%22%23666%22 font-size=%228%22 text-anchor=%22middle%22>НЕТ СИГНАЛА</text></svg>'">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <span class="badge {{ 'bg-success' if s.connected else 'bg-danger' }}">
+                            {{ 'online' if s.connected else 'offline' }}
+                        </span>
+                        {{ s.name }}
+                    </h6>
+                </div>
+                <div class="small text-secondary mt-2">
+                    <div><i class="bi bi-hash"></i> ID: <code>{{ s.id }}</code></div>
+                    <div><i class="bi bi-speedometer"></i> FPS: {{ s.fps }}</div>
+                    <div><i class="bi bi-exclamation-diamond"></i>
+                        Событий: {{ s.event_count }}
+                    </div>
+                    <div><i class="bi bi-hourglass-split"></i>
+                        Cooldown: {{ s.cooldown_sec }} с
+                    </div>
+                    {% if s.last_error %}
+                    <div class="text-danger mt-1">
+                        <i class="bi bi-x-circle"></i> {{ s.last_error }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% if current_user.is_admin %}
+                <div class="btn-group btn-group-sm w-100 mt-2">
+                    <button class="btn btn-outline-success"
+                            onclick="cameraAction('{{ s.id }}', 'start')">
+                        <i class="bi bi-play-fill"></i> Старт
+                    </button>
+                    <button class="btn btn-outline-secondary"
+                            onclick="cameraAction('{{ s.id }}', 'stop')">
+                        <i class="bi bi-stop-fill"></i> Стоп
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% if not statuses %}
+    <div class="col-12">
+        <div class="alert alert-secondary">
+            <i class="bi bi-info-circle"></i>
+            Ни один воркер не запущен. Проверьте <code>config.yaml</code>
+            (раздел <code>cameras</code>) и убедитесь, что VHS Core доступен.
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if current_user.is_admin %}
+<div class="mt-3">
+    <button class="btn btn-warning" onclick="reloadConfig()">
+        <i class="bi bi-arrow-clockwise"></i> Перезапустить движок
+        (перечитать config.yaml)
+    </button>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function cameraAction(id, action) {
+    const data = await apiCall(`/api/camera/${id}/${action}`, { method: 'POST' });
+    if (data) {
+        showToast(action === 'start' ? 'Камера запущена' : 'Камера остановлена', 'success');
+        setTimeout(() => location.reload(), 600);
+    }
+}
+
+async function reloadConfig() {
+    if (!confirm('Перезапустить движок аналитики? Активные события будут прерваны.')) return;
+    const data = await apiCall('/api/config/reload', { method: 'POST' });
+    if (data) {
+        showToast('Движок перезапущен', 'success');
+        setTimeout(() => location.reload(), 800);
+    }
+}
+
+// Автообновление статуса раз в 10 секунд
+setInterval(async () => {
+    await fetch('/api/cameras').catch(() => {});
+}, 10000);
+</script>
+{% endblock %}

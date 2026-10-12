@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Камеры — {{ branding.product_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 page-header">
+    <h4 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> Камеры</h4>
+    <div class="d-flex align-items-center gap-3">
+        <small class="text-secondary">
+            <i class="bi bi-hdd"></i>
+            Архив: {{ disk.archive_gb }} ГБ /
+            свободно {{ disk.disk_free_gb }} ГБ
+        </small>
+        <button class="btn btn-sm btn-outline-info"
+                onclick="toggleFullscreen()" title="Полный экран (F11 или F)">
+            <i class="bi bi-arrows-fullscreen"></i> Полный экран
+        </button>
+        {% if current_user.is_admin %}
+        <button class="btn btn-sm btn-outline-warning"
+                onclick="reloadConfig()" title="Перечитать config.yaml">
+            <i class="bi bi-arrow-clockwise"></i> Обновить конфиг
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% if not statuses %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    В <code>config.yaml</code> не задано ни одной камеры.
+</div>
+{% endif %}
+
+<div class="cameras-grid" id="camerasGrid">
+    {% for cam in statuses %}
+    <div class="camera-card-wrapper" id="card-{{ cam.id }}">
+        <div class="card bg-black border-secondary camera-card h-100">
+            <div class="camera-preview position-relative">
+                <img src="{{ url_for('video_feed', camera_id=cam.id) }}"
+                     alt="{{ cam.name }}"
+                     class="camera-stream"
+                     loading="lazy">
+                <span class="badge position-absolute top-0 start-0 m-2
+                    {{ 'bg-success' if cam.connected else 'bg-danger' }}"
+                    data-role="status-badge">
+                    {{ 'Онлайн' if cam.connected else 'Офлайн' }}
+                </span>
+                <span class="badge position-absolute top-0 end-0 m-2 bg-danger
+                    {{ '' if cam.recording else 'd-none' }}"
+                    data-role="rec-badge">
+                    <i class="bi bi-record-circle"></i> REC
+                </span>
+                <button class="btn btn-sm btn-dark position-absolute bottom-0 end-0 m-2
+                               fullscreen-single-btn"
+                        onclick="fullscreenSingle('{{ cam.id }}', '{{ cam.name }}')"
+                        title="Развернуть эту камеру на весь экран">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+            <div class="card-body p-2">
+                <h6 class="card-title mb-1 text-truncate">
+                    <a href="{{ url_for('camera_page', camera_id=cam.id) }}"
+                       class="text-light text-decoration-none">
+                        {{ cam.name }}
+                    </a>
+                </h6>
+                <div class="small text-secondary mb-2 camera-meta">
+                    <span class="badge bg-secondary">{{ cam.type }}</span>
+                    <span class="ms-1">{{ cam.resolution }}</span>
+                    {% if app_settings.get('ui.show_fps', '1') == '1' %}
+                    <span class="ms-1">{{ cam.fps }} fps</span>
+                    {% endif %}
+                </div>
+                {% if cam.last_error %}
+                <div class="small text-danger mb-2 text-truncate" title="{{ cam.last_error }}">
+                    <i class="bi bi-exclamation-circle"></i> {{ cam.last_error }}
+                </div>
+                {% endif %}
+                <div class="btn-group btn-group-sm w-100 camera-actions" role="group">
+                    {% if current_user.is_admin %}
+                    <button class="btn btn-outline-success"
+                            onclick="cameraAction('{{ cam.id }}', 'start')">
+                        <i class="bi bi-play-fill"></i> Старт
+                    </button>
+                    <button class="btn btn-outline-secondary"
+                            onclick="cameraAction('{{ cam.id }}', 'stop')">
+                        <i class="bi bi-stop-fill"></i> Стоп
+                    </button>
+                    <button class="btn btn-outline-danger"
+                            data-role="rec-toggle"
+                            onclick="toggleRecord('{{ cam.id }}', {{ 'true' if cam.recording else 'false' }})">
+                        {% if cam.recording %}
+                        <i class="bi bi-stop-circle"></i> Стоп
+                        {% else %}
+                        <i class="bi bi-record-circle"></i> Запись
+                        {% endif %}
+                    </button>
+                    {% else %}
+                    <a class="btn btn-outline-primary w-100"
+                       href="{{ url_for('camera_page', camera_id=cam.id) }}">
+                        <i class="bi bi-eye"></i> Открыть
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Обновление статусов раз в 5 секунд
+setInterval(refreshStatuses, 5000);
+
+async function refreshStatuses() {
+    try {
+        const resp = await fetch('/api/cameras');
+        if (!resp.ok) return;
+        const cameras = await resp.json();
+        for (const cam of cameras) {
+            const card = document.getElementById('card-' + cam.id);
+            if (!card) continue;
+
+            const badge = card.querySelector('[data-role="status-badge"]');
+            if (badge) {
+                badge.textContent = cam.connected ? 'Онлайн' : 'Офлайн';
+                badge.classList.toggle('bg-success', cam.connected);
+                badge.classList.toggle('bg-danger', !cam.connected);
+            }
+
+            const recBadge = card.querySelector('[data-role="rec-badge"]');
+            if (recBadge) recBadge.classList.toggle('d-none', !cam.recording);
+
+            const recBtn = card.querySelector('[data-role="rec-toggle"]');
+            if (recBtn) {
+                recBtn.onclick = () => toggleRecord(cam.id, cam.recording);
+                recBtn.innerHTML = cam.recording
+                    ? '<i class="bi bi-stop-circle"></i> Стоп'
+                    : '<i class="bi bi-record-circle"></i> Запись';
+            }
+        }
+    } catch (e) { /* тихо */ }
+}
+</script>
+{% endblock %}

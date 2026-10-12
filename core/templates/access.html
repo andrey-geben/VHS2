@@ -1,0 +1,782 @@
+{% extends "base.html" %}
+
+{% block title %}Доступ — {{ branding.product_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Управление доступом (АСКУД)</h4>
+    <div class="text-secondary small">
+        При распознавании номера Analytics вызывает Core —
+        номер проверяется по базе, и при совпадении срабатывает реле.
+    </div>
+</div>
+
+<ul class="nav nav-tabs border-secondary mb-3" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab"
+                data-bs-target="#tab-plates" type="button" role="tab">
+            <i class="bi bi-123"></i> Номера
+            <span class="badge bg-secondary ms-1" id="platesCount">0</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab"
+                data-bs-target="#tab-devices" type="button" role="tab">
+            <i class="bi bi-hdd-network"></i> Устройства
+            <span class="badge bg-secondary ms-1" id="devicesCount">0</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab"
+                data-bs-target="#tab-log" type="button" role="tab">
+            <i class="bi bi-journal-text"></i> Журнал
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+
+    <!-- ==================== НОМЕРА ==================== -->
+    <div class="tab-pane fade show active" id="tab-plates" role="tabpanel">
+
+        <div class="card bg-black border-secondary mb-3">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small">Поиск</label>
+                        <input type="text" class="form-control form-control-sm"
+                               id="filterSearch" placeholder="номер / владелец / описание">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Список</label>
+                        <select class="form-select form-select-sm" id="filterListType">
+                            <option value="">Все</option>
+                            <option value="white">Белый</option>
+                            <option value="black">Чёрный</option>
+                            <option value="regular">Regular</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check form-switch mt-4">
+                            <input class="form-check-input" type="checkbox"
+                                   id="filterEnabledOnly">
+                            <label class="form-check-label small" for="filterEnabledOnly">
+                                Только активные
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-5 text-end">
+                        <button class="btn btn-sm btn-primary" onclick="openPlateModal()">
+                            <i class="bi bi-plus-circle"></i> Добавить номер
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="openImportModal()">
+                            <i class="bi bi-upload"></i> Импорт CSV
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="exportPlates()">
+                            <i class="bi bi-download"></i> Экспорт
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-black border-secondary">
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">ID</th>
+                            <th style="width:140px;">Номер</th>
+                            <th style="width:120px;">Список</th>
+                            <th>Владелец</th>
+                            <th>Описание</th>
+                            <th style="width:90px;">Статус</th>
+                            <th style="width:140px;">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="platesTbody">
+                        <tr><td colspan="7" class="text-secondary text-center py-4">
+                            Загрузка…
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== УСТРОЙСТВА ==================== -->
+    <div class="tab-pane fade" id="tab-devices" role="tabpanel">
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <p class="text-secondary small mb-0">
+                Сетевые реле для открытия шлагбаума/двери. Core дёргает
+                URL при срабатывании белого списка.
+            </p>
+            <button class="btn btn-sm btn-primary" onclick="openDeviceModal()">
+                <i class="bi bi-plus-circle"></i> Добавить устройство
+            </button>
+        </div>
+
+        <div class="row g-3" id="devicesList">
+            <div class="col-12 text-secondary text-center py-4">Загрузка…</div>
+        </div>
+    </div>
+
+    <!-- ==================== ЖУРНАЛ ==================== -->
+    <div class="tab-pane fade" id="tab-log" role="tabpanel">
+
+        <div class="card bg-black border-secondary mb-3">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small">Номер</label>
+                        <input type="text" class="form-control form-control-sm"
+                               id="logFilterPlate">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Действие</label>
+                        <select class="form-select form-select-sm" id="logFilterAction">
+                            <option value="">Все</option>
+                            <option value="open">Открытие</option>
+                            <option value="deny">Отказ</option>
+                            <option value="alarm">Тревога</option>
+                            <option value="unknown">Неизвестный</option>
+                            <option value="error">Ошибка</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Дата</label>
+                        <input type="date" class="form-control form-control-sm"
+                               id="logFilterDate">
+                    </div>
+                    <div class="col-md-5 text-end">
+                        <button class="btn btn-sm btn-primary" onclick="loadLog()">
+                            <i class="bi bi-search"></i> Применить
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                onclick="clearLogFilters()">
+                            <i class="bi bi-x-circle"></i> Сбросить
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger"
+                                onclick="purgeLog()">
+                            <i class="bi bi-trash"></i> Очистить старые
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-black border-secondary">
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:150px;">Время</th>
+                            <th style="width:130px;">Номер</th>
+                            <th style="width:110px;">Действие</th>
+                            <th style="width:140px;">Устройство</th>
+                            <th style="width:110px;">Камера</th>
+                            <th>Детали</th>
+                            <th style="width:60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="logTbody">
+                        <tr><td colspan="7" class="text-secondary text-center py-4">
+                            Загрузка…
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============== Модальное окно номера ============== -->
+<div class="modal fade" id="plateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="plateModalTitle">Номер</h5>
+                <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Номер <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="plateValue"
+                           placeholder="А123ВС77"
+                           style="text-transform: uppercase; font-size: 1.2rem; letter-spacing: 3px;">
+                    <div class="form-text">Буквы и цифры. Регистр не важен.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Список</label>
+                    <select class="form-select" id="plateListType">
+                        <option value="white">Белый — открывать</option>
+                        <option value="black">Чёрный — тревога</option>
+                        <option value="regular">Regular — отказ без тревоги</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Владелец</label>
+                    <input type="text" class="form-control" id="plateOwner"
+                           placeholder="Иванов И.И.">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Описание</label>
+                    <textarea class="form-control" id="plateDescription" rows="2"
+                              placeholder="Служебный автомобиль, отдел снабжения"></textarea>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox"
+                           id="plateEnabled" checked>
+                    <label class="form-check-label" for="plateEnabled">
+                        Активен (учитывается при проверке)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary" onclick="savePlate()">
+                    <i class="bi bi-check-lg"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============== Модальное окно импорта ============== -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Импорт номеров из CSV</h5>
+                <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-secondary mb-2">
+                    Формат строки: <code>номер,список,владелец,описание</code>
+                </p>
+                <p class="small text-secondary mb-2">
+                    <code>список</code> — одно из: <code>white</code> / <code>black</code> / <code>regular</code>
+                </p>
+                <textarea class="form-control" id="importCsv" rows="12"
+                          placeholder="А123ВС77,white,Иванов И.И.,Служебный
+Е777КХ99,black,,Угнан&#10;М456ОР197,white,Петров П.П.,"
+                          style="font-family: monospace;"></textarea>
+                <div class="form-text">
+                    Заголовок можно указать или нет — он будет пропущен.
+                    Дубликаты пропускаются автоматически.
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary" onclick="doImport()">
+                    <i class="bi bi-upload"></i> Импортировать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============== Модальное окно устройства ============== -->
+<div class="modal fade" id="deviceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="deviceModalTitle">Устройство</h5>
+                <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label">Имя <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="devName"
+                               placeholder="Шлагбаум въезд">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Тип</label>
+                        <select class="form-select" id="devType">
+                            <option value="http_relay">HTTP-реле</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-9">
+                        <label class="form-label">
+                            URL открытия <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="devUrlOpen"
+                               placeholder="http://192.168.1.50/relay/1/on">
+                        <div class="form-text">
+                            GET или POST запрос — реле сработает.
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Метод</label>
+                        <select class="form-select" id="devMethod">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-9">
+                        <label class="form-label">URL закрытия</label>
+                        <input type="text" class="form-control" id="devUrlClose"
+                               placeholder="http://192.168.1.50/relay/1/off">
+                        <div class="form-text">
+                            Необязательно. Если указано — Core закроет реле
+                            автоматически через N секунд.
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Закрыть через (сек)</label>
+                        <input type="number" class="form-control"
+                               id="devDuration" value="5" min="1" max="600">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Логин (Basic Auth)</label>
+                        <input type="text" class="form-control" id="devUser">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Пароль</label>
+                        <input type="password" class="form-control" id="devPass">
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Дополнительные заголовки (JSON)</label>
+                        <input type="text" class="form-control" id="devHeaders"
+                               placeholder='{"X-Api-Key": "abc123"}'>
+                        <div class="form-text">
+                            Если реле требует спец. заголовков — укажите их JSON-объектом.
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="devEnabled" checked>
+                            <label class="form-check-label" for="devEnabled">
+                                Активно
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary" onclick="saveDevice()">
+                    <i class="bi bi-check-lg"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ====================================================================== */
+/*  УТИЛИТЫ                                                                */
+/* ====================================================================== */
+const LIST_META = {
+    white:   { name: 'Белый',   color: 'bg-success',       icon: 'bi-check-circle' },
+    black:   { name: 'Чёрный',  color: 'bg-danger',        icon: 'bi-x-octagon' },
+    regular: { name: 'Regular', color: 'bg-warning text-dark', icon: 'bi-dash-circle' },
+};
+
+const ACTION_META = {
+    open:    { name: 'Открытие',   color: 'bg-success',       icon: 'bi-unlock' },
+    deny:    { name: 'Отказ',      color: 'bg-secondary',     icon: 'bi-slash-circle' },
+    alarm:   { name: 'Тревога',    color: 'bg-danger',        icon: 'bi-exclamation-triangle' },
+    unknown: { name: 'Неизвестный', color: 'bg-info text-dark', icon: 'bi-question-circle' },
+    error:   { name: 'Ошибка',     color: 'bg-warning text-dark', icon: 'bi-exclamation-octagon' },
+};
+
+/* ====================================================================== */
+/*  НОМЕРА                                                                 */
+/* ====================================================================== */
+let editingPlateId = null;
+const plateModal = new bootstrap.Modal(document.getElementById('plateModal'));
+const importModal = new bootstrap.Modal(document.getElementById('importModal'));
+
+async function loadPlates() {
+    const params = new URLSearchParams();
+    const search = document.getElementById('filterSearch').value.trim();
+    const listType = document.getElementById('filterListType').value;
+    const enabledOnly = document.getElementById('filterEnabledOnly').checked;
+
+    if (search) params.set('search', search);
+    if (listType) params.set('list_type', listType);
+    if (enabledOnly) params.set('enabled_only', '1');
+
+    const rows = await apiCall('/api/access/plates?' + params.toString());
+    if (!rows) return;
+
+    document.getElementById('platesCount').textContent = rows.length;
+    const tbody = document.getElementById('platesTbody');
+
+    if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-secondary text-center py-4">
+            Нет номеров
+        </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = rows.map(p => {
+        const meta = LIST_META[p.list_type] || LIST_META.white;
+        return `
+        <tr>
+            <td class="small text-secondary">#${p.id}</td>
+            <td><code style="font-size: 1.05rem;">${p.plate}</code></td>
+            <td><span class="badge ${meta.color}">
+                <i class="bi ${meta.icon}"></i> ${meta.name}
+            </span></td>
+            <td class="small">${p.owner || '—'}</td>
+            <td class="small text-truncate" style="max-width:250px;"
+                title="${p.description || ''}">${p.description || '—'}</td>
+            <td>${p.enabled
+                ? '<span class="badge bg-success">активен</span>'
+                : '<span class="badge bg-secondary">выкл</span>'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-warning me-1"
+                        onclick='editPlate(${JSON.stringify(p)})'>
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="deletePlate(${p.id}, '${p.plate}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+        `;
+    }).join('');
+}
+
+function openPlateModal(data = null) {
+    editingPlateId = data ? data.id : null;
+    document.getElementById('plateModalTitle').textContent =
+        data ? 'Редактирование номера' : 'Новый номер';
+    document.getElementById('plateValue').value = data ? data.plate : '';
+    document.getElementById('plateListType').value = data ? data.list_type : 'white';
+    document.getElementById('plateOwner').value = data ? (data.owner || '') : '';
+    document.getElementById('plateDescription').value = data ? (data.description || '') : '';
+    document.getElementById('plateEnabled').checked = data ? !!data.enabled : true;
+    plateModal.show();
+}
+
+function editPlate(data) {
+    openPlateModal(data);
+}
+
+async function savePlate() {
+    const payload = {
+        plate: document.getElementById('plateValue').value.trim().toUpperCase(),
+        list_type: document.getElementById('plateListType').value,
+        owner: document.getElementById('plateOwner').value.trim(),
+        description: document.getElementById('plateDescription').value.trim(),
+        enabled: document.getElementById('plateEnabled').checked,
+    };
+
+    if (!payload.plate) {
+        return showToast('Введите номер', 'warning');
+    }
+
+    const url = editingPlateId
+        ? '/api/access/plates/' + editingPlateId
+        : '/api/access/plates';
+    const method = editingPlateId ? 'PUT' : 'POST';
+
+    const data = await apiCall(url, {
+        method,
+        body: JSON.stringify(payload),
+    });
+    if (data) {
+        showToast('Номер сохранён', 'success');
+        plateModal.hide();
+        loadPlates();
+    }
+}
+
+async function deletePlate(id, plate) {
+    if (!confirm(`Удалить номер ${plate}?`)) return;
+    const data = await apiCall('/api/access/plates/' + id, { method: 'DELETE' });
+    if (data) {
+        showToast('Номер удалён', 'success');
+        loadPlates();
+    }
+}
+
+function openImportModal() {
+    document.getElementById('importCsv').value = '';
+    importModal.show();
+}
+
+async function doImport() {
+    const csv = document.getElementById('importCsv').value;
+    if (!csv.trim()) {
+        return showToast('Вставьте CSV-данные', 'warning');
+    }
+    const data = await apiCall('/api/access/plates/import', {
+        method: 'POST',
+        body: JSON.stringify({ csv }),
+    });
+    if (data) {
+        let msg = `Добавлено: ${data.added}`;
+        if (data.skipped) msg += `, пропущено: ${data.skipped}`;
+        if (data.errors && data.errors.length) {
+            msg += `, ошибок: ${data.errors.length}`;
+            console.warn('Ошибки импорта:', data.errors);
+        }
+        showToast(msg, data.added > 0 ? 'success' : 'info', 5000);
+        importModal.hide();
+        loadPlates();
+    }
+}
+
+function exportPlates() {
+    window.location.href = '/api/access/plates/export';
+}
+
+/* ====================================================================== */
+/*  УСТРОЙСТВА                                                             */
+/* ====================================================================== */
+let editingDeviceId = null;
+const deviceModal = new bootstrap.Modal(document.getElementById('deviceModal'));
+
+async function loadDevices() {
+    const rows = await apiCall('/api/access/devices');
+    if (!rows) return;
+
+    document.getElementById('devicesCount').textContent = rows.length;
+    const list = document.getElementById('devicesList');
+
+    if (!rows.length) {
+        list.innerHTML = `
+            <div class="col-12 text-secondary text-center py-4">
+                Устройств нет. Добавьте первое — например, сетевое реле шлагбаума.
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = rows.map(d => `
+        <div class="col-md-6 col-xl-4">
+            <div class="card bg-black border-secondary h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0">
+                            <i class="bi bi-hdd-network text-primary"></i>
+                            ${d.name}
+                        </h6>
+                        <span class="badge ${d.enabled ? 'bg-success' : 'bg-secondary'}">
+                            ${d.enabled ? 'активно' : 'выкл'}
+                        </span>
+                    </div>
+                    <div class="small text-secondary">
+                        <div class="text-truncate" title="${d.url_open}">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                            <code>${d.url_open}</code>
+                        </div>
+                        ${d.url_close ? `
+                            <div class="text-truncate" title="${d.url_close}">
+                                <i class="bi bi-box-arrow-in-left"></i>
+                                <code>${d.url_close}</code>
+                            </div>` : ''}
+                        <div class="mt-1">
+                            <i class="bi bi-clock"></i> Закрыть через: ${d.open_duration_sec} с
+                            · ${d.method}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer border-secondary bg-transparent p-2">
+                    <div class="btn-group btn-group-sm w-100">
+                        <button class="btn btn-outline-success"
+                                onclick="testDevice(${d.id})" title="Тест">
+                            <i class="bi bi-play-fill"></i> Тест
+                        </button>
+                        <button class="btn btn-outline-warning"
+                                onclick='editDevice(${JSON.stringify(d)})'>
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-outline-danger"
+                                onclick="deleteDevice(${d.id}, '${d.name}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function openDeviceModal(data = null) {
+    editingDeviceId = data ? data.id : null;
+    document.getElementById('deviceModalTitle').textContent =
+        data ? 'Редактирование устройства' : 'Новое устройство';
+    document.getElementById('devName').value = data ? data.name : '';
+    document.getElementById('devType').value = data ? data.type : 'http_relay';
+    document.getElementById('devUrlOpen').value = data ? data.url_open : '';
+    document.getElementById('devUrlClose').value = data ? (data.url_close || '') : '';
+    document.getElementById('devMethod').value = data ? data.method : 'GET';
+    document.getElementById('devDuration').value = data ? data.open_duration_sec : 5;
+    document.getElementById('devUser').value = data ? (data.username || '') : '';
+    document.getElementById('devPass').value = data ? (data.password || '') : '';
+    document.getElementById('devHeaders').value = data ? (data.headers_json || '') : '';
+    document.getElementById('devEnabled').checked = data ? !!data.enabled : true;
+    deviceModal.show();
+}
+
+function editDevice(data) {
+    openDeviceModal(data);
+}
+
+async function saveDevice() {
+    const payload = {
+        name: document.getElementById('devName').value.trim(),
+        type: document.getElementById('devType').value,
+        url_open: document.getElementById('devUrlOpen').value.trim(),
+        url_close: document.getElementById('devUrlClose').value.trim(),
+        method: document.getElementById('devMethod').value,
+        open_duration_sec: parseInt(document.getElementById('devDuration').value, 10) || 5,
+        username: document.getElementById('devUser').value.trim(),
+        password: document.getElementById('devPass').value,
+        headers_json: document.getElementById('devHeaders').value.trim(),
+        enabled: document.getElementById('devEnabled').checked,
+    };
+
+    if (!payload.name || !payload.url_open) {
+        return showToast('Имя и URL открытия обязательны', 'warning');
+    }
+
+    const url = editingDeviceId
+        ? '/api/access/devices/' + editingDeviceId
+        : '/api/access/devices';
+    const method = editingDeviceId ? 'PUT' : 'POST';
+
+    const data = await apiCall(url, {
+        method,
+        body: JSON.stringify(payload),
+    });
+    if (data) {
+        showToast('Устройство сохранено', 'success');
+        deviceModal.hide();
+        loadDevices();
+    }
+}
+
+async function deleteDevice(id, name) {
+    if (!confirm(`Удалить устройство "${name}"?`)) return;
+    const data = await apiCall('/api/access/devices/' + id, { method: 'DELETE' });
+    if (data) {
+        showToast('Устройство удалено', 'success');
+        loadDevices();
+    }
+}
+
+async function testDevice(id) {
+    if (!confirm('Отправить тестовый сигнал на устройство?')) return;
+    const data = await apiCall(`/api/access/devices/${id}/test`, { method: 'POST' });
+    if (data && data.ok) {
+        showToast('Устройство сработало', 'success');
+    } else {
+        showToast(data ? (data.error || 'Ошибка') : 'Ошибка', 'danger');
+    }
+}
+
+/* ====================================================================== */
+/*  ЖУРНАЛ                                                                 */
+/* ====================================================================== */
+async function loadLog() {
+    const params = new URLSearchParams();
+    const plate = document.getElementById('logFilterPlate').value.trim();
+    const action = document.getElementById('logFilterAction').value;
+    const date = document.getElementById('logFilterDate').value;
+
+    if (plate) params.set('plate', plate);
+    if (action) params.set('action', action);
+    if (date) params.set('date', date);
+    params.set('limit', '200');
+
+    const data = await apiCall('/api/access/log?' + params.toString());
+    if (!data) return;
+
+    const tbody = document.getElementById('logTbody');
+    const events = data.events || [];
+
+    if (!events.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-secondary text-center py-4">
+            Нет записей
+        </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = events.map(e => {
+        const meta = ACTION_META[e.action] || { name: e.action, color: 'bg-secondary', icon: 'bi-info' };
+        return `
+        <tr>
+            <td class="small">${e.created_at.replace('T', ' ')}</td>
+            <td><code>${e.plate || '—'}</code></td>
+            <td><span class="badge ${meta.color}">
+                <i class="bi ${meta.icon}"></i> ${meta.name}
+            </span></td>
+            <td class="small">${e.device_name || '—'}</td>
+            <td class="small"><code>${e.camera_id || '—'}</code></td>
+            <td class="small text-truncate" style="max-width:300px;"
+                title="${e.details || ''}">${e.details || '—'}</td>
+            <td>
+                ${e.snapshot_url ? `
+                    <a href="${e.snapshot_url}" target="_blank"
+                       class="btn btn-sm btn-outline-info" title="Снапшот">
+                        <i class="bi bi-image"></i>
+                    </a>` : ''}
+            </td>
+        </tr>
+        `;
+    }).join('');
+}
+
+function clearLogFilters() {
+    document.getElementById('logFilterPlate').value = '';
+    document.getElementById('logFilterAction').value = '';
+    document.getElementById('logFilterDate').value = '';
+    loadLog();
+}
+
+async function purgeLog() {
+    const days = prompt('Удалить записи журнала старше N дней:', '90');
+    if (days === null) return;
+    const d = parseInt(days, 10);
+    if (!d || d < 1) return showToast('Некорректное число', 'warning');
+
+    const data = await apiCall('/api/access/log/purge', {
+        method: 'POST',
+        body: JSON.stringify({ days: d }),
+    });
+    if (data) {
+        showToast(`Удалено записей: ${data.removed}`, 'success');
+        loadLog();
+    }
+}
+
+/* ====================================================================== */
+/*  ИНИЦИАЛИЗАЦИЯ                                                          */
+/* ====================================================================== */
+loadPlates();
+loadDevices();
+loadLog();
+
+// Автопоиск по мере ввода
+['filterSearch', 'filterListType', 'filterEnabledOnly'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('change', loadPlates);
+    if (id === 'filterSearch') {
+        let t;
+        el.addEventListener('input', () => {
+            clearTimeout(t);
+            t = setTimeout(loadPlates, 400);
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Пользователи — VHS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-people"></i> Пользователи</h4>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
+        <i class="bi bi-person-plus"></i> Добавить пользователя
+    </button>
+</div>
+
+<div class="card bg-black border-secondary">
+    <div class="card-body p-0">
+        <table class="table table-dark table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th style="width:60px;">ID</th>
+                    <th>Логин</th>
+                    <th style="width:200px;">Роль</th>
+                    <th style="width:200px;">Создан</th>
+                    <th style="width:240px;">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr data-user-id="{{ u.id }}">
+                    <td>{{ u.id }}</td>
+                    <td>
+                        {{ u.username }}
+                        {% if u.id|string == current_user.id %}
+                        <span class="badge bg-secondary ms-1">это вы</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm role-select"
+                                data-user-id="{{ u.id }}"
+                                {% if u.id|string == current_user.id %}disabled{% endif %}>
+                            <option value="admin"
+                                {% if u.role == 'admin' %}selected{% endif %}>
+                                Администратор
+                            </option>
+                            <option value="viewer"
+                                {% if u.role == 'viewer' %}selected{% endif %}>
+                                Просмотр
+                            </option>
+                        </select>
+                    </td>
+                    <td class="small text-secondary">
+                        {{ u.created_at[:19].replace('T', ' ') if u.created_at else '—' }}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning"
+                                onclick="resetPassword({{ u.id }}, '{{ u.username }}')">
+                            <i class="bi bi-key"></i> Сменить пароль
+                        </button>
+                        {% if u.id|string != current_user.id %}
+                        <button class="btn btn-sm btn-outline-danger"
+                                onclick="deleteUser({{ u.id }}, '{{ u.username }}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not users %}
+                <tr>
+                    <td colspan="5" class="text-secondary text-center py-4">
+                        Пользователей нет.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальное окно создания пользователя -->
+<div class="modal fade" id="createUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Новый пользователь</h5>
+                <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Логин</label>
+                    <input type="text" class="form-control" id="newUsername"
+                           minlength="3" placeholder="минимум 3 символа">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Пароль</label>
+                    <input type="password" class="form-control" id="newPassword"
+                           minlength="4" placeholder="минимум 4 символа">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Роль</label>
+                    <select class="form-select" id="newRole">
+                        <option value="viewer" selected>Просмотр</option>
+                        <option value="admin">Администратор</option>
+                    </select>
+                    <div class="form-text">
+                        «Просмотр» — только камеры и архив. «Администратор» — полный доступ.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary" onclick="createUser()">
+                    <i class="bi bi-check-lg"></i> Создать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ---------------------------------------------------------------------- */
+/*  Смена роли через выпадающий список                                     */
+/* ---------------------------------------------------------------------- */
+document.querySelectorAll('.role-select').forEach(sel => {
+    sel.addEventListener('change', async () => {
+        const userId = sel.dataset.userId;
+        const role = sel.value;
+        const data = await apiCall(`/api/users/${userId}/role`, {
+            method: 'POST',
+            body: JSON.stringify({ role }),
+        });
+        if (data) {
+            showToast('Роль обновлена', 'success');
+        } else {
+            // Откатываем — перезагружаем страницу, чтобы показать актуальное
+            setTimeout(() => location.reload(), 800);
+        }
+    });
+});
+
+/* ---------------------------------------------------------------------- */
+/*  Создание пользователя                                                  */
+/* ---------------------------------------------------------------------- */
+async function createUser() {
+    const username = document.getElementById('newUsername').value.trim();
+    const password = document.getElementById('newPassword').value;
+    const role = document.getElementById('newRole').value;
+
+    if (!username || username.length < 3) {
+        return showToast('Логин должен быть не короче 3 символов', 'warning');
+    }
+    if (!password || password.length < 4) {
+        return showToast('Пароль должен быть не короче 4 символов', 'warning');
+    }
+
+    const data = await apiCall('/api/users', {
+        method: 'POST',
+        body: JSON.stringify({ username, password, role }),
+    });
+    if (data) {
+        showToast('Пользователь создан', 'success');
+        setTimeout(() => location.reload(), 500);
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Удаление пользователя                                                  */
+/* ---------------------------------------------------------------------- */
+async function deleteUser(userId, username) {
+    if (!confirm(`Удалить пользователя "${username}"?`)) return;
+    const data = await apiCall(`/api/users/${userId}`, { method: 'DELETE' });
+    if (data) {
+        showToast('Пользователь удалён', 'success');
+        setTimeout(() => location.reload(), 500);
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Сброс пароля                                                           */
+/* ---------------------------------------------------------------------- */
+async function resetPassword(userId, username) {
+    const pwd = prompt(`Новый пароль для "${username}" (минимум 4 символа):`);
+    if (pwd === null) return;  // отмена
+    if (pwd.length < 4) {
+        return showToast('Пароль слишком короткий', 'warning');
+    }
+    const data = await apiCall(`/api/users/${userId}/password`, {
+        method: 'POST',
+        body: JSON.stringify({ password: pwd }),
+    });
+    if (data) showToast('Пароль обновлён', 'success');
+}
+</script>
+{% endblock %}

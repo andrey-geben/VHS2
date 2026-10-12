@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Профиль — {{ branding.product_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card bg-black border-secondary">
+            <div class="card-header border-secondary">
+                <i class="bi bi-person-gear"></i> Профиль — {{ current_user.username }}
+            </div>
+            <div class="card-body">
+                <p class="small text-secondary">
+                    Роль:
+                    <span class="badge {{ 'bg-danger' if current_user.is_admin else 'bg-info' }}">
+                        {{ 'Администратор' if current_user.is_admin else 'Просмотр' }}
+                    </span>
+                </p>
+                <hr class="border-secondary">
+                <h6 class="mb-3">Смена пароля</h6>
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label">Текущий пароль</label>
+                        <input type="password" class="form-control"
+                               name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Новый пароль</label>
+                        <input type="password" class="form-control"
+                               name="new_password" minlength="4" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Повторите новый пароль</label>
+                        <input type="password" class="form-control"
+                               name="confirm_password" minlength="4" required>
+                    </div>
+                    <button class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Сохранить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

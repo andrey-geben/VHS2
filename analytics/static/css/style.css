@@ -1,0 +1,122 @@
+/* ==================================================================== */
+/*  Общие стили                                                          */
+/* ==================================================================== */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+}
+
+.bg-dark { background-color: #111 !important; }
+.bg-black { background-color: #000 !important; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+code {
+    color: #f8b862;
+    background: rgba(255, 200, 100, 0.1);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+.card-header {
+    background-color: #0a0a0a !important;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.navbar-brand {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+/* ==================================================================== */
+/*  Камеры (дашборд)                                                     */
+/* ==================================================================== */
+.camera-mini img {
+    background: #000;
+    display: block;
+    max-height: 180px;
+}
+
+/* ==================================================================== */
+/*  Карточки событий                                                     */
+/* ==================================================================== */
+.event-card {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.event-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(13, 202, 240, 0.2);
+}
+
+/* ==================================================================== */
+/*  Бейдж с номером — на карточке события                                */
+/* ==================================================================== */
+.plate-badge {
+    font-family: "Arial Black", "Arial Bold", Arial, sans-serif;
+    font-size: 1.15rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-align: center;
+    color: #000;
+    background: #fff;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-bottom: 6px;
+    /* Немного наклоняем для сходства с настоящим номером */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+/* ==================================================================== */
+/*  Крупный номер — на странице события                                  */
+/* ==================================================================== */
+.plate-badge-big {
+    display: inline-block;
+    font-family: "Arial Black", "Arial Bold", Arial, sans-serif;
+    font-size: 3rem;
+    font-weight: 900;
+    letter-spacing: 8px;
+    color: #000;
+    background: #fff;
+    border: 3px solid #ccc;
+    border-radius: 10px;
+    padding: 8px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    line-height: 1.1;
+}
+
+/* Светлая тема */
+body.bg-light .card.bg-black {
+    background-color: #fff !important;
+    color: #111 !important;
+    border-color: #dee2e6 !important;
+}
+body.bg-light .card-header {
+    background-color: #f8f9fa !important;
+    color: #111;
+}
+body.bg-light .navbar.bg-black {
+    background-color: #212529 !important;
+}
+body.bg-light .table-dark {
+    --bs-table-bg: transparent;
+    --bs-table-color: #111;
+}
+
+/* Адаптив для крупного номера на мобильных */
+@media (max-width: 575.98px) {
+    .plate-badge-big {
+        font-size: 1.6rem;
+        letter-spacing: 4px;
+        padding: 6px 14px;
+    }
+    .plate-badge {
+        font-size: 1rem;
+        letter-spacing: 1px;
+    }
+}

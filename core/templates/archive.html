@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block title %}Архив — {{ branding.product_name }}{% endblock %}
+
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-archive"></i> Архив записей</h4>
+
+<!-- Табы: Записи / Маркеры -->
+<ul class="nav nav-tabs border-secondary mb-3" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab"
+                data-bs-target="#tab-recordings" type="button">
+            <i class="bi bi-camera-video"></i> Записи
+            <span class="badge bg-secondary ms-1" id="recCount">0</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab"
+                data-bs-target="#tab-markers" type="button">
+            <i class="bi bi-bookmark-star"></i> Маркеры событий
+            <span class="badge bg-secondary ms-1" id="markerCount">0</span>
+        </button>
+    </li>
+</ul>
+
+<!-- Фильтры (общие для обоих табов) -->
+<div class="card bg-black border-secondary mb-3">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small">Камера</label>
+                <select class="form-select form-select-sm" id="filterCamera">
+                    <option value="">Все камеры</option>
+                    {% for cam in cameras %}
+                    <option value="{{ cam.id }}">{{ cam.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Дата</label>
+                <input type="date" class="form-control form-control-sm" id="filterDate">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Тип маркера</label>
+                <select class="form-select form-select-sm" id="filterMarkerType">
+                    <option value="">Все типы</option>
+                    <option value="person">Человек</option>
+                    <option value="car">Автомобиль</option>
+                    <option value="truck">Грузовик</option>
+                    <option value="bus">Автобус</option>
+                    <option value="motion">Движение</option>
+                    <option value="alarm">Тревога</option>
+                    <option value="event">Событие</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-sm btn-primary w-100" onclick="applyFilters()">
+                    <i class="bi bi-search"></i> Применить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="tab-content">
+
+    <!-- =================== ТАБ: ЗАПИСИ =================== -->
+    <div class="tab-pane fade show active" id="tab-recordings" role="tabpanel">
+        <div class="row g-3">
+            <!-- Плеер -->
+            <div class="col-lg-5">
+                <div class="card bg-black border-secondary">
+                    <div class="card-header border-secondary">
+                        <i class="bi bi-play-circle"></i> Просмотр
+                    </div>
+                    <div class="card-body p-0">
+                        <video id="player" class="w-100 bg-black" controls
+                               preload="metadata" style="aspect-ratio: 16/9;">
+                            Ваш браузер не поддерживает видео.
+                        </video>
+                        <div class="p-2 small text-secondary" id="playerInfo">
+                            Выберите запись из списка.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Календарь с датами -->
+                <div class="card bg-black border-secondary mt-3">
+                    <div class="card-header border-secondary">
+                        <i class="bi bi-calendar3"></i> Даты с записями (30 дн.)
+                    </div>
+                    <div class="card-body p-2">
+                        <div id="datesSummary" class="dates-summary">
+                            <small class="text-secondary">Загрузка…</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Список записей -->
+            <div class="col-lg-7">
+                <div class="card bg-black border-secondary">
+                    <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-list-ul"></i> Записи</span>
+                        <span class="small text-secondary" id="recSummary"></span>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 70vh; overflow-y: auto;">
+                        <div id="recordsList">
+                            <div class="text-secondary text-center py-4 small">
+                                Нет данных
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================== ТАБ: МАРКЕРЫ =================== -->
+    <div class="tab-pane fade" id="tab-markers" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="card bg-black border-secondary">
+                    <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-bookmark-star"></i> Маркеры событий</span>
+                        <span class="small text-secondary">
+                            Создаются автоматически из модуля аналитики
+                        </span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="markersList">
+                            <div class="text-secondary text-center py-4 small">
+                                Нет маркеров
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ==================================================================== */
+/*  Метаданные типов маркеров                                            */
+/* ==================================================================== */
+const MARKER_META = {
+    person:     { icon: 'bi-person-fill',       color: '#00c8ff', name: 'Человек' },
+    car:        { icon: 'bi-car-front-fill',    color: '#00e676', name: 'Автомобиль' },
+    truck:      { icon: 'bi-truck',             color: '#ff9800', name: 'Грузовик' },
+    bus:        { icon: 'bi-bus-front-fill',    color: '#ff5722', name: 'Автобус' },
+    motorcycle: { icon: 'bi-bicycle',           color: '#2196f3', name: 'Мотоцикл' },
+    bicycle:    { icon: 'bi-bicycle',           color: '#ffeb3b', name: 'Велосипед' },
+    motion:     { icon: 'bi-broadcast',         color: '#9e9e9e', name: 'Движение' },
+    alarm:      { icon: 'bi-exclamation-triangle-fill', color: '#f44336', name: 'Тревога' },
+    event:      { icon: 'bi-bookmark-fill',     color: '#9c27b0', name: 'Событие' },
+    note:       { icon: 'bi-sticky',            color: '#607d8b', name: 'Заметка' },
+};
+function markerMeta(t) {
+    return MARKER_META[t] || { icon: 'bi-bookmark', color: '#9e9e9e', name: t };
+}
+
+/* ==================================================================== */
+/*  Фильтры                                                              */
+/* ==================================================================== */
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('camera_id')) {
+    document.getElementById('filterCamera').value = urlParams.get('camera_id');
+}
+
+function applyFilters() {
+    loadRecordings();
+    loadDatesSummary();
+    loadMarkers();
+}
+
+['filterCamera', 'filterDate', 'filterMarkerType'].forEach(id => {
+    document.getElementById(id).addEventListener('change', applyFilters);
+});
+
+/* ==================================================================== */
+/*  Записи                                                               */
+/* ==================================================================== */
+async function loadRecordings() {
+    const cameraId = document.getElementById('filterCamera').value;
+    const dateStr = document.getElementById('filterDate').value;
+
+    const params = new URLSearchParams();
+    if (cameraId) params.set('camera_id', cameraId);
+    if (dateStr) params.set('date', dateStr);
+
+    const resp = await fetch('/api/archive?' + params.toString());
+    const rows = await resp.json();
+    renderRecordings(rows);
+}
+
+async function loadDatesSummary() {
+    const cameraId = document.getElementById('filterCamera').value;
+    const params = new URLSearchParams();
+    if (cameraId) params.set('camera_id', cameraId);
+
+    const resp = await fetch('/api/archive/dates?' + params.toString());
+    const summary = await resp.json();
+    renderDatesSummary(summary);
+}
+
+function renderDatesSummary(summary) {
+    const el = document.getElementById('datesSummary');
+    const keys = Object.keys(summary).sort().reverse();
+    if (!keys.length) {
+        el.innerHTML = '<small class="text-secondary">Нет записей</small>';
+        return;
+    }
+    el.innerHTML = keys.map(d =>
+        `<button class="btn btn-sm btn-outline-info me-1 mb-1"
+                 onclick="selectDate('${d}')">
+            ${d.slice(5)} <span class="badge bg-secondary">${summary[d]}</span>
+        </button>`
+    ).join('');
+}
+
+function selectDate(d) {
+    document.getElementById('filterDate').value = d;
+    applyFilters();
+}
+
+function renderRecordings(rows) {
+    const list = document.getElementById('recordsList');
+    document.getElementById('recCount').textContent = rows.length;
+    const totalMb = rows.reduce((s, r) => s + (r.filesize_mb || 0), 0);
+    document.getElementById('recSummary').textContent =
+        `${rows.length} зап. · ${totalMb.toFixed(1)} МБ`;
+
+    if (!rows.length) {
+        list.innerHTML = '<div class="text-secondary text-center py-4 small">' +
+                         'Нет записей</div>';
+        return;
+    }
+
+    list.innerHTML = rows.map(r => `
+        <div class="list-group-item bg-black text-light border-secondary">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="me-2 flex-grow-1" style="min-width:0;">
+                    <div class="small text-truncate">
+                        <i class="bi bi-camera-video"></i> ${r.camera_id}
+                    </div>
+                    <div class="small text-secondary">
+                        ${r.start_time.replace('T', ' ')}
+                    </div>
+                    <div class="small text-secondary">
+                        ${r.duration_str} · ${r.filesize_mb} МБ
+                    </div>
+                </div>
+                <div class="btn-group-vertical btn-group-sm">
+                    <button class="btn btn-outline-primary"
+                            onclick="playRecording(${r.id}, '${r.start_time}', ${r.duration || 0})">
+                        <i class="bi bi-play-fill"></i>
+                    </button>
+                    <a class="btn btn-outline-secondary"
+                       href="/archive/download/${r.id}">
+                        <i class="bi bi-download"></i>
+                    </a>
+                    {% if current_user.is_admin %}
+                    <button class="btn btn-outline-danger"
+                            onclick="deleteRecording(${r.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function playRecording(id, startTime, duration) {
+    const player = document.getElementById('player');
+    player.src = '/archive/play/' + id;
+    player.play();
+    document.getElementById('playerInfo').textContent =
+        `Запись #${id} · ${startTime.replace('T', ' ')} · ${duration} сек`;
+}
+
+async function deleteRecording(id) {
+    if (!confirm('Удалить запись #' + id + '?')) return;
+    const resp = await fetch('/api/archive/' + id, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.ok) {
+        applyFilters();
+    } else {
+        alert('Не удалось удалить запись.');
+    }
+}
+
+/* ==================================================================== */
+/*  Маркеры                                                              */
+/* ==================================================================== */
+async function loadMarkers() {
+    const cameraId = document.getElementById('filterCamera').value;
+    const dateStr = document.getElementById('filterDate').value;
+    const markerType = document.getElementById('filterMarkerType').value;
+
+    const params = new URLSearchParams();
+    if (cameraId) params.set('camera_id', cameraId);
+    if (dateStr) params.set('date', dateStr);
+    params.set('limit', '500');
+
+    const resp = await fetch('/api/markers?' + params.toString());
+    let rows = await resp.json();
+
+    // Клиентский фильтр по типу (API пока не поддерживает)
+    if (markerType) {
+        rows = rows.filter(m => m.marker_type === markerType);
+    }
+    renderMarkers(rows);
+}
+
+function renderMarkers(rows) {
+    const list = document.getElementById('markersList');
+    document.getElementById('markerCount').textContent = rows.length;
+
+    if (!rows.length) {
+        list.innerHTML = '<div class="text-secondary text-center py-4 small">' +
+                         'Нет маркеров</div>';
+        return;
+    }
+
+    list.innerHTML = `
+        <table class="table table-dark table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th style="width:80px;">ID</th>
+                    <th style="width:150px;">Тип</th>
+                    <th style="width:180px;">Время</th>
+                    <th style="width:150px;">Камера</th>
+                    <th>Описание</th>
+                    <th style="width:200px;">Снапшот / источник</th>
+                    {% if current_user.is_admin %}
+                    <th style="width:80px;"></th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(m => {
+                    const meta = markerMeta(m.marker_type);
+                    return `
+                    <tr>
+                        <td class="small text-secondary">#${m.id}</td>
+                        <td>
+                            <span class="badge"
+                                  style="background:${meta.color};color:#000;">
+                                <i class="bi ${meta.icon}"></i> ${meta.name}
+                            </span>
+                        </td>
+                        <td class="small">
+                            ${m.created_at.replace('T', ' ')}
+                        </td>
+                        <td class="small">
+                            <code>${m.camera_id}</code>
+                        </td>
+                        <td class="small">${m.description || '—'}</td>
+                        <td class="small">
+                            ${m.snapshot_url
+                                ? `<a href="${m.snapshot_url}" target="_blank"
+                                       class="text-info">
+                                       <i class="bi bi-image"></i> открыть снапшот
+                                   </a>`
+                                : (m.source ? `<span class="text-secondary">${m.source}</span>` : '—')}
+                            ${m.external_id
+                                ? `<div class="text-secondary" style="font-size:0.75em;">
+                                       ext: ${m.external_id}
+                                   </div>`
+                                : ''}
+                        </td>
+                        {% if current_user.is_admin %}
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="deleteMarker(${m.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+async function deleteMarker(id) {
+    if (!confirm('Удалить маркер #' + id + '?')) return;
+    const resp = await fetch('/api/marker/' + id, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.ok) {
+        loadMarkers();
+    } else {
+        alert('Не удалось удалить маркер.');
+    }
+}
+
+/* ==================================================================== */
+/*  Первичная загрузка                                                   */
+/* ==================================================================== */
+loadRecordings();
+loadDatesSummary();
+loadMarkers();
+</script>
+{% endblock %}

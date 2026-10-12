@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}События — {{ branding.product_name }}{% endblock %}
+
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-list-ul"></i> События</h4>
+
+<div class="card bg-black border-secondary mb-3">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small">Камера</label>
+                <select class="form-select form-select-sm" id="fCamera">
+                    <option value="">Все</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Тип объекта</label>
+                <select class="form-select form-select-sm" id="fType">
+                    <option value="">Все типы</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Дата</label>
+                <input type="date" class="form-control form-control-sm" id="fDate">
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-sm btn-primary w-100" onclick="loadEvents()">
+                    <i class="bi bi-search"></i> Применить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="text-secondary small">
+        Найдено: <span id="totalCount">0</span>
+    </span>
+    <div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="prevPage()" id="btnPrev">
+            <i class="bi bi-chevron-left"></i>
+        </button>
+        <span class="mx-2 small" id="pageInfo">стр. 1</span>
+        <button class="btn btn-sm btn-outline-secondary" onclick="nextPage()" id="btnNext">
+            <i class="bi bi-chevron-right"></i>
+        </button>
+    </div>
+</div>
+
+<div id="eventsGrid" class="row g-3"></div>
+
+<div id="emptyState" class="text-center py-5 d-none">
+    <i class="bi bi-inbox text-secondary" style="font-size: 3rem;"></i>
+    <p class="text-secondary mt-2">Событий нет</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PAGE_SIZE = 50;
+let currentOffset = 0;
+
+/* Иконки и цвета для типов событий */
+const TYPE_META = {
+    person:     { icon: 'bi-person-fill',       color: '#00c8ff' },
+    car:        { icon: 'bi-car-front-fill',    color: '#00e676' },
+    truck:      { icon: 'bi-truck',             color: '#ff9800' },
+    bus:        { icon: 'bi-bus-front-fill',    color: '#ff5722' },
+    motorcycle: { icon: 'bi-bicycle',           color: '#2196f3' },
+    bicycle:    { icon: 'bi-bicycle',           color: '#ffeb3b' },
+    plate:      { icon: 'bi-123',               color: '#e91e63' },   /* номер */
+    motion:     { icon: 'bi-broadcast',         color: '#9e9e9e' },
+};
+const TYPE_NAMES = {
+    person: 'Человек',
+    car: 'Автомобиль',
+    truck: 'Грузовик',
+    bus: 'Автобус',
+    motorcycle: 'Мотоцикл',
+    bicycle: 'Велосипед',
+    plate: 'Номер',
+    motion: 'Движение',
+};
+
+function typeMeta(t) {
+    return TYPE_META[t] || { icon: 'bi-box', color: '#9e9e9e' };
+}
+function typeName(t) {
+    return TYPE_NAMES[t] || t;
+}
+
+/* Извлекаем номер из события */
+function getPlateText(e) {
+    // Основное поле
+    if (e.plate_text) return e.plate_text;
+    // Пробуем из extra JSON (на случай старых событий)
+    if (e.extra) {
+        try {
+            const extra = JSON.parse(e.extra);
+            if (extra.plate) return extra.plate;
+        } catch (_) {}
+    }
+    return null;
+}
+
+async function loadCameraOptions() {
+    const s = await apiCall('/api/cameras');
+    if (!s) return;
+    const sel = document.getElementById('fCamera');
+    for (const cam of s) {
+        const opt = document.createElement('option');
+        opt.value = cam.id;
+        opt.textContent = cam.name;
+        sel.appendChild(opt);
+    }
+}
+
+async function loadTypeOptions() {
+    const types = await apiCall('/api/event_types');
+    if (!types) return;
+    const sel = document.getElementById('fType');
+    for (const t of types) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = typeName(t);
+        sel.appendChild(opt);
+    }
+}
+
+async function loadEvents() {
+    const cameraId = document.getElementById('fCamera').value;
+    const type = document.getElementById('fType').value;
+    const date = document.getElementById('fDate').value;
+
+    const params = new URLSearchParams();
+    if (cameraId) params.set('camera_id', cameraId);
+    if (type) params.set('event_type', type);
+    if (date) params.set('date', date);
+    params.set('limit', PAGE_SIZE);
+    params.set('offset', currentOffset);
+
+    const data = await apiCall('/api/events?' + params.toString());
+    if (!data) return;
+
+    document.getElementById('totalCount').textContent = data.total;
+    document.getElementById('pageInfo').textContent =
+        `стр. ${Math.floor(currentOffset / PAGE_SIZE) + 1}`;
+    document.getElementById('btnPrev').disabled = currentOffset === 0;
+    document.getElementById('btnNext').disabled =
+        currentOffset + PAGE_SIZE >= data.total;
+
+    renderEvents(data.events);
+}
+
+function renderEvents(events) {
+    const grid = document.getElementById('eventsGrid');
+    const empty = document.getElementById('emptyState');
+
+    if (!events.length) {
+        grid.innerHTML = '';
+        empty.classList.remove('d-none');
+        return;
+    }
+    empty.classList.add('d-none');
+
+    grid.innerHTML = events.map(e => {
+        const meta = typeMeta(e.event_type);
+        const name = typeName(e.event_type);
+        const conf = e.confidence != null ? e.confidence.toFixed(2) : '—';
+        const plate = getPlateText(e);
+
+        return `
+        <div class="col-sm-6 col-md-4 col-lg-3">
+            <div class="card bg-black border-secondary h-100 event-card"
+                 onclick="location.href='/event/${e.id}'">
+                ${e.snapshot_path
+                    ? `<img src="/snapshot/${e.id}" class="card-img-top"
+                            style="aspect-ratio: 16/9; object-fit: cover;">`
+                    : `<div class="bg-secondary" style="aspect-ratio: 16/9;"></div>`}
+                <div class="card-body p-2">
+                    ${plate
+                        ? `<div class="plate-badge">${plate}</div>`
+                        : `<div class="d-flex justify-content-between align-items-center mb-1">
+                               <span class="badge" style="background:${meta.color};color:#000;">
+                                   <i class="bi ${meta.icon}"></i> ${name}
+                               </span>
+                               <span class="small text-secondary">${conf}</span>
+                           </div>`}
+                    <div class="small text-truncate">
+                        <i class="bi bi-clock"></i> ${e.created_at.replace('T', ' ')}
+                    </div>
+                    <div class="small text-truncate">
+                        <i class="bi bi-camera-video"></i>
+                        ${e.camera_name || e.camera_id}
+                    </div>
+                    ${e.zone_name
+                        ? `<div class="small text-info text-truncate">
+                               <i class="bi bi-geo"></i> ${e.zone_name}
+                           </div>`
+                        : ''}
+                </div>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+function nextPage() {
+    currentOffset += PAGE_SIZE;
+    loadEvents();
+}
+
+function prevPage() {
+    currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
+    loadEvents();
+}
+
+['fCamera', 'fType', 'fDate'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+        currentOffset = 0;
+        loadEvents();
+    });
+});
+
+Promise.all([loadCameraOptions(), loadTypeOptions()]).then(loadEvents);
+</script>
+{% endblock %}

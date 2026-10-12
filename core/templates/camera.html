@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}{{ camera.name }} — {{ branding.product_name }}{% endblock %}
+
+{% block body_attrs %}data-camera-id="{{ camera.id }}"{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 page-header">
+    <h4 class="mb-0">
+        <a href="{{ url_for('index') }}" class="text-secondary text-decoration-none">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        {{ camera.name }}
+    </h4>
+    <div class="d-flex gap-2 align-items-center">
+        <span class="badge {{ 'bg-success' if status.connected else 'bg-danger' }}">
+            {{ 'Онлайн' if status.connected else 'Офлайн' }}
+        </span>
+        <span class="badge bg-secondary">{{ status.type }}</span>
+        <span class="badge bg-secondary">{{ status.resolution }}</span>
+        <span class="badge bg-secondary">{{ status.fps }} fps</span>
+        <button class="btn btn-sm btn-outline-info"
+                onclick="fullscreenSingle('{{ camera.id }}', '{{ camera.name }}')"
+                title="Полный экран (F11 или F)">
+            <i class="bi bi-arrows-fullscreen"></i> Полный экран
+        </button>
+    </div>
+</div>
+
+<div class="row g-3" id="cameraRow">
+    <div class="col-lg-8" id="cameraVideoCol">
+        <div class="card bg-black border-secondary">
+            <img src="{{ url_for('video_feed', camera_id=camera.id) }}"
+                 class="card-img-top camera-stream"
+                 id="cameraStream"
+                 alt="{{ camera.name }}">
+        </div>
+
+        <div class="mt-3 d-flex gap-2 flex-wrap camera-controls">
+            {% if current_user.is_admin %}
+            <button class="btn btn-outline-success"
+                    onclick="cameraAction('{{ camera.id }}', 'start')">
+                <i class="bi bi-play-fill"></i> Старт потока
+            </button>
+            <button class="btn btn-outline-secondary"
+                    onclick="cameraAction('{{ camera.id }}', 'stop')">
+                <i class="bi bi-stop-fill"></i> Стоп потока
+            </button>
+            <button class="btn {{ 'btn-danger' if status.recording else 'btn-outline-danger' }}"
+                    id="recBtn"
+                    onclick="toggleRecord('{{ camera.id }}', {{ 'true' if status.recording else 'false' }})">
+                {% if status.recording %}
+                <i class="bi bi-stop-circle"></i> Остановить запись
+                {% else %}
+                <i class="bi bi-record-circle"></i> Начать запись
+                {% endif %}
+            </button>
+            {% endif %}
+            <a class="btn btn-outline-info"
+               href="{{ url_for('archive_page') }}?camera_id={{ camera.id }}">
+                <i class="bi bi-archive"></i> Архив камеры
+            </a>
+        </div>
+
+        {% if status.last_error %}
+        <div class="alert alert-danger mt-3 mb-0">
+            <i class="bi bi-exclamation-triangle"></i> {{ status.last_error }}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4" id="cameraSideCol">
+        {% if has_ptz and current_user.is_admin %}
+        <div class="card bg-black border-secondary">
+            <div class="card-header border-secondary">
+                <i class="bi bi-joystick"></i> Управление PTZ
+            </div>
+            <div class="card-body">
+                <div class="ptz-grid">
+                    <button class="btn btn-outline-light ptz-btn" onclick="ptz('{{ camera.id }}','up')">
+                        <i class="bi bi-chevron-up"></i>
+                    </button>
+                    <button class="btn btn-outline-light ptz-btn" onclick="ptz('{{ camera.id }}','left')">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button class="btn btn-outline-danger ptz-btn" onclick="ptzStop('{{ camera.id }}')">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                    <button class="btn btn-outline-light ptz-btn" onclick="ptz('{{ camera.id }}','right')">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button class="btn btn-outline-light ptz-btn" onclick="ptz('{{ camera.id }}','down')">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <button class="btn btn-outline-info ptz-btn" onclick="ptz('{{ camera.id }}','zoom_in')">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-outline-info ptz-btn" onclick="ptz('{{ camera.id }}','zoom_out')">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label small">Скорость:
+                        <span id="ptzSpeedVal">0.5</span></label>
+                    <input type="range" class="form-range" id="ptzSpeed"
+                           min="0.1" max="1.0" step="0.1" value="0.5"
+                           oninput="document.getElementById('ptzSpeedVal').textContent = this.value">
+                </div>
+            </div>
+        </div>
+        {% elif has_ptz %}
+        <div class="card bg-black border-secondary">
+            <div class="card-body text-secondary text-center small">
+                <i class="bi bi-lock"></i> Управление PTZ только для администратора.
+            </div>
+        </div>
+        {% else %}
+        <div class="card bg-black border-secondary">
+            <div class="card-body text-secondary text-center">
+                <i class="bi bi-info-circle"></i><br>
+                PTZ не настроен для этой камеры.
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card bg-black border-secondary mt-3 camera-info">
+            <div class="card-header border-secondary">
+                <i class="bi bi-info-circle"></i> Информация
+            </div>
+            <div class="card-body small">
+                <div class="row mb-1"><div class="col-5 text-secondary">ID:</div>
+                    <div class="col-7"><code>{{ status.id }}</code></div></div>
+                <div class="row mb-1"><div class="col-5 text-secondary">Тип:</div>
+                    <div class="col-7">{{ status.type }}</div></div>
+                <div class="row mb-1"><div class="col-5 text-secondary">Источник:</div>
+                    <div class="col-7 text-truncate" title="{{ status.source }}">{{ status.source }}</div></div>
+                <div class="row mb-1"><div class="col-5 text-secondary">Разрешение:</div>
+                    <div class="col-7">{{ status.resolution }}</div></div>
+                <div class="row"><div class="col-5 text-secondary">FPS:</div>
+                    <div class="col-7">{{ status.fps }}</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

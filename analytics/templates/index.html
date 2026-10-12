@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — {{ branding.product_name }}{% endblock %}
+
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-speedometer2"></i> Дашборд</h4>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-black border-secondary">
+            <div class="card-body">
+                <div class="text-secondary small">Всего событий</div>
+                <div class="display-6">{{ total_events }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-black border-secondary">
+            <div class="card-body">
+                <div class="text-secondary small">Сегодня</div>
+                <div class="display-6">{{ events_today }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-black border-secondary">
+            <div class="card-body">
+                <div class="text-secondary small">Активных камер</div>
+                <div class="display-6">
+                    {{ statuses|selectattr('connected')|list|length }} / {{ statuses|length }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-black border-secondary">
+            <div class="card-body">
+                <div class="text-secondary small">Средний FPS</div>
+                <div class="display-6">
+                    {% if statuses %}
+                        {{ (statuses|sum(attribute='fps') / statuses|length)|round(1) }}
+                    {% else %}0{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card bg-black border-secondary">
+            <div class="card-header border-secondary">
+                <i class="bi bi-camera-video"></i> Камеры
+            </div>
+            <div class="card-body p-2">
+                {% for s in statuses %}
+                <div class="camera-mini mb-2">
+                    <div class="d-flex justify-content-between align-items-center small mb-1">
+                        <span>
+                            <span class="badge {{ 'bg-success' if s.connected else 'bg-danger' }}">
+                                {{ 'online' if s.connected else 'offline' }}
+                            </span>
+                            {{ s.name }}
+                        </span>
+                        <span class="text-secondary">{{ s.fps }} fps · {{ s.event_count }} соб.</span>
+                    </div>
+                    <img src="{{ url_for('preview', camera_id=s.id) }}"
+                         class="w-100 rounded" style="aspect-ratio: 16/9; object-fit: cover;"
+                         onerror="this.style.display='none'">
+                </div>
+                {% endfor %}
+                {% if not statuses %}
+                <p class="text-secondary text-center small py-3">Камеры не запущены</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card bg-black border-secondary">
+            <div class="card-header border-secondary d-flex justify-content-between">
+                <span><i class="bi bi-clock-history"></i> Последние события</span>
+                <a href="{{ url_for('events_page') }}" class="small">Все события →</a>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:90px;">Снапшот</th>
+                            <th>Время</th>
+                            <th>Камера</th>
+                            <th>Зона</th>
+                            <th style="width:80px;">Площадь</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in recent_events %}
+                        <tr style="cursor:pointer"
+                            onclick="location.href='{{ url_for('event_page', event_id=e.id) }}'">
+                            <td>
+                                {% if e.snapshot_path %}
+                                <img src="{{ url_for('snapshot', event_id=e.id) }}"
+                                     style="width: 70px; height: 40px; object-fit: cover;"
+                                     class="rounded">
+                                {% else %}
+                                <span class="text-secondary small">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">{{ e.created_at.replace('T', ' ') }}</td>
+                            <td class="small">{{ e.camera_name or e.camera_id }}</td>
+                            <td class="small">{{ e.zone_name or '—' }}</td>
+                            <td class="small text-secondary">{{ e.area }} px</td>
+                        </tr>
+                    {% endfor %}
+                    {% if not recent_events %}
+                        <tr><td colspan="5" class="text-secondary text-center py-4">
+                            Событий пока нет
+                        </td></tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

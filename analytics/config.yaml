@@ -1,0 +1,190 @@
+# ==================================================================== #
+#  VHS-Analytics — конфигурация модуля аналитики
+# ==================================================================== #
+#  Автор и владелец проекта: Andrew Geben
+# ==================================================================== #
+
+server:
+  host: "0.0.0.0"
+  port: 8100
+  secret_key: "change-this-analytics-secret"
+  snapshots_dir: "snapshots"
+  public_url: "http://localhost:8100"
+
+auth:
+  default_user: "admin"
+  default_password: "admin"
+
+branding:
+  product_name: "VHS Analytics"
+  company: "VHS Surveillance"
+  author: "Andrew Geben"
+  copyright_holder: "Andrew Geben"
+  copyright_year: ""
+  version: "0.8.0"
+  show_version: true
+
+vhs_core:
+  base_url: "http://localhost:8000"
+  api_token: "change-this-analytics-token"
+  timeout: 5.0
+  actions_enabled: true
+
+cameras:
+  - id: "analog_1"
+    name: "Аналоговая камера 1"
+    enabled: true
+    detect_classes: ["person", "car"]
+    zones:
+      - name: "Зона входа"
+        x: 100
+        y: 80
+        w: 440
+        h: 320
+
+  - id: "ip_1"
+    name: "IP камера — вход"
+    enabled: false
+    detect_classes: []
+    zones: []
+
+detector:
+  mode: "alpr"
+
+  motion:
+    history: 500
+    var_threshold: 25
+    min_area: 800
+    max_area: 60000
+    min_solidity: 0.35
+    detect_shadows: false
+    morph_kernel: 5
+    warmup_frames: 60
+
+  yolo:
+    model_path: "models/yolov8n.onnx"
+    confidence: 0.45
+    nms: 0.45
+    imgsz: 640
+    min_area: 1500
+    use_gpu: false
+    warmup: true
+    classes: []
+
+  alpr:
+    detector_model: "yolo-v9-t-384-license-plate-end2end"
+    detection_confidence: 0.3
+    ocr_confidence: 0.5
+    padding_ratio: 0.1
+    process_every_n_frames: 5
+    voting_window_sec: 3.0
+    min_votes: 2
+    cooldown_same_plate_sec: 30
+    cooldown_any_sec: 5
+    ocr_target_height: 96
+    ocr_use_threshold: false
+    debug: false
+
+events:
+  cooldown_sec: 10
+  snapshot_retention_days: 30
+  save_snapshots: true
+  snapshot_quality: 80
+  snapshot_width: 640
+  snapshot_height: 0
+
+# ==================================================================== #
+#  Действия (обратный канал Analytics → VHS Core)
+# ==================================================================== #
+actions:
+  enabled: true
+
+  # ---- АСКУД (управление доступом) ----
+  # Если включено — при распознавании номера Analytics автоматически
+  # отправляет его в Core на проверку по базе белых/чёрных номеров.
+  # Core сам решает: открыть реле, отказать или поднять тревогу.
+  # Результат приходит в ответе и логируется.
+  access_check_enabled: true
+
+  # Длительность записи по умолчанию
+  default_record_duration_sec: 60
+  # Максимальная длительность записи
+  max_record_duration_sec: 600
+
+  rules:
+    # --- Правило 1: человек → маркер + короткая запись ---
+    - name: "person_alert"
+      enabled: true
+      cameras: []
+      event_types: ["person"]
+      actions:
+        - type: "marker"
+          marker_type: "person"
+          description: "Обнаружен человек"
+        - type: "record"
+          duration_sec: 60
+
+    # --- Правило 2: любая машина → маркер + запись 30 сек ---
+    - name: "car_entry"
+      enabled: true
+      cameras: []
+      event_types: ["car", "truck", "bus"]
+      actions:
+        - type: "marker"
+          marker_type: "car"
+          description: "Автомобиль"
+        - type: "record"
+          duration_sec: 30
+
+    # --- Правило 3: любой распознанный номер → маркер + запись ---
+    #              (АСКУД-проверка выполняется АВТОМАТИЧЕСКИ до правил)
+    - name: "any_plate"
+      enabled: true
+      cameras: []
+      event_types: ["plate"]
+      actions:
+        - type: "marker"
+          marker_type: "plate"
+          description: "Распознан номер"
+        - type: "record"
+          duration_sec: 60
+
+    # --- Правило 4: номер из чёрного списка → тревога ---
+    #              Реакция по результату АСКУД от Core.
+    - name: "access_alarm"
+      enabled: true
+      cameras: []
+      event_types: ["plate"]
+      access_actions: ["alarm"]     # действия из Core: alarm
+      actions:
+        - type: "marker"
+          marker_type: "alarm"
+          description: "⚠️ Номер из чёрного списка"
+        - type: "record"
+          duration_sec: 180
+
+    # --- Правило 5: номер из белого списка → открыто ---
+    - name: "access_open"
+      enabled: true
+      cameras: []
+      event_types: ["plate"]
+      access_actions: ["open"]      # действия из Core: open
+      actions:
+        - type: "marker"
+          marker_type: "note"
+          description: "Свой автомобиль — проезд разрешён"
+        - type: "record"
+          duration_sec: 30
+
+    # --- Правило 6: движение ночью → тревога ---
+    - name: "night_motion"
+      enabled: true
+      cameras: []
+      event_types: []
+      time_range:
+        from: "20:00"
+        to: "08:00"
+      actions:
+        - type: "marker"
+          marker_type: "alarm"
+          description: "Движение в нерабочее время"

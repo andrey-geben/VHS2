@@ -1,0 +1,285 @@
+/* ==================================================================== */
+/*  Общие стили                                                          */
+/* ==================================================================== */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+}
+
+.bg-dark { background-color: #111 !important; }
+.bg-black { background-color: #000 !important; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+code {
+    color: #f8b862;
+    background: rgba(255, 200, 100, 0.1);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+/* ==================================================================== */
+/*  Сетка камер на главной                                               */
+/* ==================================================================== */
+.cameras-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr));
+}
+
+.camera-card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    overflow: hidden;
+}
+.camera-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 150, 255, 0.15);
+}
+
+.camera-preview {
+    background: #000;
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    position: relative;
+}
+.camera-stream {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.fullscreen-single-btn {
+    opacity: 0.4;
+    transition: opacity 0.15s ease;
+    z-index: 2;
+}
+.camera-card:hover .fullscreen-single-btn {
+    opacity: 1;
+}
+
+/* ==================================================================== */
+/*  PTZ-пульт                                                             */
+/* ==================================================================== */
+.ptz-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 240px;
+    margin: 0 auto;
+    grid-template-areas:
+        ". up ."
+        "left stop right"
+        ". down ."
+        "zoom_in zoom_in zoom_out";
+}
+.ptz-grid .btn:nth-child(1) { grid-area: up; }
+.ptz-grid .btn:nth-child(2) { grid-area: left; }
+.ptz-grid .btn:nth-child(3) { grid-area: stop; }
+.ptz-grid .btn:nth-child(4) { grid-area: right; }
+.ptz-grid .btn:nth-child(5) { grid-area: down; }
+.ptz-grid .btn:nth-child(6) { grid-area: zoom_in; }
+.ptz-grid .btn:nth-child(7) { grid-area: zoom_out; }
+
+.ptz-btn {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+.ptz-grid .btn:nth-child(6),
+.ptz-grid .btn:nth-child(7) {
+    aspect-ratio: auto;
+    height: 42px;
+}
+
+/* ==================================================================== */
+/*  Архив                                                                 */
+/* ==================================================================== */
+.dates-summary {
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 2px;
+}
+#recordsList .list-group-item {
+    border-left: none;
+    border-right: none;
+}
+#recordsList .list-group-item:hover {
+    background-color: #181818 !important;
+}
+#player {
+    display: block;
+    max-height: 60vh;
+}
+
+/* Маркеры */
+#markersList .badge {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+}
+#markersList code {
+    font-size: 0.85em;
+}
+
+/* ==================================================================== */
+/*  Плавающая кнопка выхода из fullscreen                                */
+/* ==================================================================== */
+.fullscreen-exit-btn {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10000;
+    display: none;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+}
+.fullscreen-exit-btn:hover { opacity: 1; }
+
+/* ==================================================================== */
+/*  ПОЛНОЭКРАННЫЙ РЕЖИМ                                                  */
+/* ==================================================================== */
+body.is-fullscreen { overflow: hidden; }
+
+body.is-fullscreen #mainNavbar,
+body.is-fullscreen #mainFooter {
+    display: none !important;
+}
+
+body.is-fullscreen #mainContent {
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 100vh;
+    overflow: auto;
+}
+
+body.is-fullscreen .page-header { display: none !important; }
+
+body.is-fullscreen .cameras-grid {
+    gap: 2px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    height: 100vh;
+    align-content: stretch;
+}
+
+body.is-fullscreen .camera-card {
+    border-radius: 0 !important;
+    border: 1px solid #222 !important;
+    height: 100%;
+}
+
+body.is-fullscreen .camera-preview {
+    aspect-ratio: auto;
+    flex: 1 1 auto;
+    height: 100%;
+}
+
+body.is-fullscreen .camera-card .card-body {
+    display: none;
+}
+
+body.is-fullscreen .fullscreen-exit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* --- Режим одной камеры на весь экран --- */
+body.is-single-fullscreen #mainNavbar,
+body.is-single-fullscreen #mainFooter,
+body.is-single-fullscreen .page-header,
+body.is-single-fullscreen #cameraSideCol,
+body.is-single-fullscreen .camera-controls,
+body.is-single-fullscreen .alert {
+    display: none !important;
+}
+
+body.is-single-fullscreen #mainContent {
+    padding: 0 !important;
+    height: 100vh;
+    overflow: hidden;
+}
+
+body.is-single-fullscreen #cameraRow {
+    margin: 0 !important;
+    height: 100vh;
+}
+
+body.is-single-fullscreen #cameraVideoCol {
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    height: 100vh;
+}
+
+body.is-single-fullscreen #cameraVideoCol .card {
+    border: none !important;
+    border-radius: 0 !important;
+    background: #000 !important;
+    height: 100vh;
+}
+
+body.is-single-fullscreen #cameraStream {
+    width: 100%;
+    height: 100vh;
+    object-fit: contain;
+}
+
+body.is-single-fullscreen .fullscreen-exit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ==================================================================== */
+/*  Разное                                                                */
+/* ==================================================================== */
+.card-header {
+    background-color: #0a0a0a !important;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.navbar-brand {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.nav-link.btn {
+    text-decoration: none;
+}
+
+@media (max-width: 575.98px) {
+    .camera-card .btn-group-sm .btn {
+        padding: 0.35rem 0.4rem;
+        font-size: 0.75rem;
+    }
+    .cameras-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+}
+
+/* Светлая тема */
+body.bg-light .card.bg-black {
+    background-color: #fff !important;
+    color: #111 !important;
+    border-color: #dee2e6 !important;
+}
+body.bg-light .card-header {
+    background-color: #f8f9fa !important;
+    color: #111;
+}
+body.bg-light .navbar.bg-black {
+    background-color: #212529 !important;
+}
+body.bg-light .table-dark {
+    --bs-table-bg: transparent;
+    --bs-table-color: #111;
+}

@@ -1,0 +1,1102 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки — {{ branding.product_name }}{% endblock %}
+
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-gear"></i> Настройки</h4>
+
+<ul class="nav nav-tabs border-secondary mb-3" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-cameras"
+                type="button" role="tab">
+            <i class="bi bi-camera-video"></i> Камеры
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analytics"
+                type="button" role="tab" id="tabAnalyticsBtn">
+            <i class="bi bi-cpu"></i> Аналитика
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ui"
+                type="button" role="tab">
+            <i class="bi bi-palette"></i> Внешний вид
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-system"
+                type="button" role="tab">
+            <i class="bi bi-hdd-stack"></i> Система
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+
+    <!-- ==================== КАМЕРЫ ==================== -->
+    <div class="tab-pane fade show active" id="tab-cameras" role="tabpanel">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <p class="text-secondary small mb-0">
+                Изменения сохраняются в <code>config.yaml</code> и применяются сразу.
+                Комментарии в файле будут потеряны.
+            </p>
+            <button class="btn btn-primary" onclick="openCameraModal()">
+                <i class="bi bi-plus-circle"></i> Добавить камеру
+            </button>
+        </div>
+
+        <div class="card bg-black border-secondary">
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:110px;">ID</th>
+                            <th>Имя</th>
+                            <th style="width:80px;">Тип</th>
+                            <th>Источник</th>
+                            <th style="width:90px;">Разрешение</th>
+                            <th style="width:220px;">Аналитика</th>
+                            <th style="width:80px;">Статус</th>
+                            <th style="width:110px;">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="camerasTbody">
+                    {% for c in cameras %}
+                        {% set ana = c.analytics or {} %}
+                        <tr data-camera-id="{{ c.id }}">
+                            <td><code>{{ c.id }}</code></td>
+                            <td>{{ c.name }}</td>
+                            <td><span class="badge bg-secondary">{{ c.type }}</span></td>
+                            <td class="text-truncate" style="max-width:200px;"
+                                title="{{ c.source }}">{{ c.source }}</td>
+                            <td>{{ c.width }}×{{ c.height }}</td>
+                            <td>
+                                {% if not ana.enabled %}
+                                    <span class="badge bg-secondary">выкл</span>
+                                {% else %}
+                                    {% if ana.detect_objects %}
+                                        <span class="badge bg-info text-dark"
+                                              title="Детекция объектов">
+                                            <i class="bi bi-person-fill"></i>
+                                        </span>
+                                    {% endif %}
+                                    {% if ana.detect_plates %}
+                                        <span class="badge bg-danger"
+                                              title="Номера">
+                                            <i class="bi bi-123"></i>
+                                        </span>
+                                    {% endif %}
+                                    {% if ana.detect_faces %}
+                                        <span class="badge bg-warning text-dark"
+                                              title="Лица">
+                                            <i class="bi bi-emoji-smile"></i>
+                                        </span>
+                                    {% endif %}
+                                    {% if ana.detect_motion %}
+                                        <span class="badge bg-primary"
+                                              title="Движение">
+                                            <i class="bi bi-broadcast"></i>
+                                        </span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.enabled %}
+                                <span class="badge bg-success">вкл</span>
+                                {% else %}
+                                <span class="badge bg-secondary">выкл</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-warning me-1"
+                                        onclick='editCamera({{ c|tojson }})'>
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        onclick="deleteCamera('{{ c.id }}')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if not cameras %}
+                        <tr>
+                            <td colspan="8" class="text-secondary text-center py-4">
+                                Камер пока нет. Нажмите «Добавить камеру».
+                            </td>
+                        </tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== АНАЛИТИКА ==================== -->
+    <div class="tab-pane fade" id="tab-analytics" role="tabpanel">
+
+        <div class="card bg-black border-secondary mb-3">
+            <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-activity"></i> Состояние модуля аналитики</span>
+                <span class="badge" id="anaStatusBadge">загрузка…</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <div class="text-secondary small">Состояние</div>
+                        <div id="anaStatusState" class="fs-5">—</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-secondary small">PID</div>
+                        <div id="anaStatusPid" class="fs-5">—</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-secondary small">Uptime</div>
+                        <div id="anaStatusUptime" class="fs-5">—</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-secondary small">Перезапусков за час</div>
+                        <div id="anaStatusRestarts" class="fs-5">—</div>
+                    </div>
+                </div>
+                <div class="small text-danger mb-2 d-none" id="anaLastErrorBox">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span id="anaLastError"></span>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-success" onclick="anaStart()">
+                        <i class="bi bi-play-fill"></i> Запустить
+                    </button>
+                    <button class="btn btn-warning" onclick="anaRestart()">
+                        <i class="bi bi-arrow-clockwise"></i> Перезапустить
+                    </button>
+                    <button class="btn btn-danger" onclick="anaStop()">
+                        <i class="bi bi-stop-fill"></i> Остановить
+                    </button>
+                    <button class="btn btn-outline-info" onclick="openAnalyticsUI()">
+                        <i class="bi bi-box-arrow-up-right"></i> Открыть Analytics UI
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-black border-secondary mb-3">
+            <div class="card-header border-secondary">
+                <i class="bi bi-sliders"></i> Настройки модуля аналитики
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="anaManaged">
+                            <label class="form-check-label" for="anaManaged">
+                                <strong>Управлять Analytics из Core</strong>
+                                <div class="small text-secondary">
+                                    Если выключено — Core не будет запускать/останавливать
+                                    Analytics, раздел станет информационным.
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-12"><hr class="border-secondary"></div>
+
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="anaAutoStart">
+                            <label class="form-check-label" for="anaAutoStart">
+                                Автоматически запускать при старте Core
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="anaAutoRestart">
+                            <label class="form-check-label" for="anaAutoRestart">
+                                Автоматически перезапускать при сбое
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Максимум перезапусков за час</label>
+                        <input type="number" class="form-control" id="anaMaxRestarts"
+                               min="1" max="20" value="3">
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mt-4">
+                            <input class="form-check-input" type="checkbox"
+                                   id="anaTrayNotifications">
+                            <label class="form-check-label" for="anaTrayNotifications">
+                                Уведомления в трее
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-12"><hr class="border-secondary"></div>
+
+                    <div class="col-md-8">
+                        <label class="form-label">Путь к исполняемому файлу Analytics</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="anaExePath"
+                                   placeholder="..\analytics\VHS-Analytics.exe">
+                            <button class="btn btn-outline-info" type="button"
+                                    onclick="anaCheckPath()">
+                                <i class="bi bi-search"></i> Проверить
+                            </button>
+                        </div>
+                        <div class="form-text" id="anaPathResult"></div>
+                        <div class="form-text">
+                            Абсолютный путь или относительный от папки Core.
+                            При отсутствии — автопоиск.
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">URL Analytics</label>
+                        <input type="text" class="form-control" id="anaUrl"
+                               placeholder="http://localhost:8100">
+                    </div>
+
+                    <div class="col-12">
+                        <button class="btn btn-primary" onclick="saveAnalyticsSettings()">
+                            <i class="bi bi-check-lg"></i> Сохранить настройки
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-black border-secondary">
+            <div class="card-header border-secondary">
+                <i class="bi bi-info-circle"></i> Как это работает
+            </div>
+            <div class="card-body small text-secondary">
+                <p class="mb-2">
+                    <strong>Типы аналитики</strong> для каждой камеры
+                    задаются в разделе <strong>Камеры</strong>
+                    (кнопка «Редактировать»). Можно включать комбинацию:
+                </p>
+                <ul class="mb-2">
+                    <li><span class="badge bg-info text-dark">
+                        <i class="bi bi-person-fill"></i></span>
+                        — детекция объектов (YOLO: person, car, truck, ...)</li>
+                    <li><span class="badge bg-danger">
+                        <i class="bi bi-123"></i></span>
+                        — распознавание автомобильных номеров (ALPR)</li>
+                    <li><span class="badge bg-warning text-dark">
+                        <i class="bi bi-emoji-smile"></i></span>
+                        — распознавание лиц <em>(в разработке)</em></li>
+                    <li><span class="badge bg-primary">
+                        <i class="bi bi-broadcast"></i></span>
+                        — детекция движения (MOG2)</li>
+                </ul>
+                <p class="mb-0">
+                    При смене режима — нажмите <strong>Перезапустить</strong>,
+                    чтобы Analytics перечитал конфиг.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== ВНЕШНИЙ ВИД ==================== -->
+    <div class="tab-pane fade" id="tab-ui" role="tabpanel">
+        <div class="card bg-black border-secondary">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Тема</label>
+                        <select class="form-select" id="setTheme">
+                            <option value="dark">Тёмная</option>
+                            <option value="light">Светлая</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Акцентный цвет</label>
+                        <input type="color" class="form-control form-control-color"
+                               id="setAccent" value="#0d6efd">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Плиток в ряду</label>
+                        <select class="form-select" id="setTileColumns">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="6">6</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Страница по умолчанию</label>
+                        <select class="form-select" id="setDefaultPage">
+                            <option value="index">Камеры</option>
+                            <option value="archive">Архив</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="setShowFps">
+                            <label class="form-check-label" for="setShowFps">
+                                Показывать FPS на плитках камер
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-3" onclick="saveUiSettings()">
+                    <i class="bi bi-check-lg"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== СИСТЕМА ==================== -->
+    <div class="tab-pane fade" id="tab-system" role="tabpanel">
+
+        <div class="card bg-black border-secondary mb-3">
+            <div class="card-header border-secondary">
+                <i class="bi bi-hdd"></i> Хранилище записей
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Папка для хранения записей</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="storagePath"
+                                   placeholder="recordings">
+                            <button class="btn btn-outline-info" type="button"
+                                    onclick="storageCheckPath()">
+                                <i class="bi bi-search"></i> Проверить
+                            </button>
+                            <button class="btn btn-primary" type="button"
+                                    onclick="storageSetPath()">
+                                <i class="bi bi-check-lg"></i> Применить
+                            </button>
+                        </div>
+                        <div class="form-text" id="storagePathResult"></div>
+                        <div class="form-text">
+                            Локальный диск, UNC-путь (<code>\\NAS\video</code>)
+                            или внешний диск.
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="alert alert-warning mb-0 small">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Внимание:</strong> при смене папки
+                            все камеры будут остановлены и запущены заново.
+                            Новые записи пойдут в новую папку. Старые останутся
+                            в прежней, но будут доступны в архиве, пока папка не удалена.
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="row g-3 small">
+                            <div class="col-md-6">
+                                <div class="text-secondary">Текущая папка:</div>
+                                <div class="text-truncate" id="storageCurrentDir">
+                                    <code>—</code>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-secondary">Размер архива:</div>
+                                <div id="storageArchiveSize">—</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-secondary">Свободно на диске:</div>
+                                <div id="storageFreeSpace">—</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-secondary small mb-1">
+                            История папок (для чтения старых записей):
+                        </div>
+                        <div id="storageHistory" class="small">
+                            <span class="text-secondary">пусто</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary mt-2"
+                                onclick="storageForgetHistory()">
+                            <i class="bi bi-x-circle"></i> Очистить историю
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-black border-secondary">
+            <div class="card-header border-secondary">
+                <i class="bi bi-gear-wide-connected"></i> Прочие настройки
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            Хранить архив (дней)
+                            <small class="text-secondary">0 = без ограничений</small>
+                        </label>
+                        <input type="number" class="form-control" id="setArchiveDays"
+                               min="0" max="3650" value="0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            Качество MJPEG-потока
+                            <small class="text-secondary">40–95</small>
+                        </label>
+                        <input type="range" class="form-range" id="setMjpegQuality"
+                               min="40" max="95" step="5" value="80">
+                        <div class="small text-secondary">
+                            Значение: <span id="mjpegQualityVal">80</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-3" onclick="saveSystemSettings()">
+                    <i class="bi bi-check-lg"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============== Модальное окно камеры ============== -->
+<div class="modal fade" id="cameraModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="cameraModalTitle">Камера</h5>
+                <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">ID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="camId"
+                               placeholder="front_door">
+                        <div class="form-text">Буквы, цифры, _ и -.</div>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Имя <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="camName"
+                               placeholder="Входная дверь">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Тип</label>
+                        <select class="form-select" id="camType" onchange="onCamTypeChange()">
+                            <option value="ip">IP (RTSP/HTTP)</option>
+                            <option value="analog">Аналоговая</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Источник <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="camSource"
+                               placeholder="rtsp://user:pass@192.168.1.10:554/stream1">
+                        <div class="form-text" id="camSourceHint">
+                            rtsp://… , http://… или https://…
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Разрешение</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="camWidth" value="640">
+                            <span class="input-group-text">×</span>
+                            <input type="number" class="form-control" id="camHeight" value="480">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">FPS</label>
+                        <input type="number" class="form-control" id="camFps" value="25">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">&nbsp;</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox"
+                                   id="camEnabled" checked>
+                            <label class="form-check-label" for="camEnabled">Включена</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">&nbsp;</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox"
+                                   id="camAutoRecord">
+                            <label class="form-check-label" for="camAutoRecord">
+                                Автозапись
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-12"><hr class="border-secondary"></div>
+
+                    <!-- ========== Аналитика ========== -->
+                    <div class="col-12">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox"
+                                   id="anaCamEnabled" onchange="onAnalyticsToggle()">
+                            <label class="form-check-label" for="anaCamEnabled">
+                                <strong>Включить аналитику для этой камеры</strong>
+                            </label>
+                        </div>
+
+                        <div class="border border-secondary rounded p-3"
+                             id="anaFlagsBlock"
+                             style="background: rgba(255,255,255,0.02);">
+                            <div class="text-secondary small mb-2">
+                                Типы аналитики:
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       id="anaDetectObjects">
+                                <label class="form-check-label" for="anaDetectObjects">
+                                    <i class="bi bi-person-fill text-info"></i>
+                                    <strong>Детекция объектов</strong>
+                                    <div class="small text-secondary">
+                                        YOLO: люди, машины, грузовики, автобусы и др.
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox"
+                                       id="anaDetectPlates">
+                                <label class="form-check-label" for="anaDetectPlates">
+                                    <i class="bi bi-123 text-danger"></i>
+                                    <strong>Распознавание номеров</strong>
+                                    <div class="small text-secondary">
+                                        ALPR: детектор номеров + OCR.
+                                        Работает с АСКУД (белый/чёрный список).
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox"
+                                       id="anaDetectFaces" disabled>
+                                <label class="form-check-label" for="anaDetectFaces">
+                                    <i class="bi bi-emoji-smile text-warning"></i>
+                                    <strong>Распознавание лиц</strong>
+                                    <span class="badge bg-secondary">скоро</span>
+                                    <div class="small text-secondary">
+                                        В разработке. Требует модель InsightFace.
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox"
+                                       id="anaDetectMotion">
+                                <label class="form-check-label" for="anaDetectMotion">
+                                    <i class="bi bi-broadcast text-primary"></i>
+                                    <strong>Детекция движения</strong>
+                                    <div class="small text-secondary">
+                                        MOG2 — простая детекция движения.
+                                        Не требует GPU.
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12"><hr class="border-secondary"></div>
+
+                    <!-- PTZ -->
+                    <div class="col-md-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="camPtzEnabled" onchange="onPtzToggle()">
+                            <label class="form-check-label" for="camPtzEnabled">
+                                PTZ (ONVIF)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">PTZ IP</label>
+                        <input type="text" class="form-control" id="camPtzIp"
+                               placeholder="192.168.1.10" disabled>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Порт</label>
+                        <input type="number" class="form-control" id="camPtzPort"
+                               value="80" disabled>
+                    </div>
+                    <div class="col-md-2"></div>
+                    <div class="col-md-6">
+                        <label class="form-label">PTZ логин</label>
+                        <input type="text" class="form-control" id="camPtzUser" disabled>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">PTZ пароль</label>
+                        <input type="password" class="form-control" id="camPtzPass" disabled>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary" onclick="saveCamera()">
+                    <i class="bi bi-check-lg"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ====================================================================== */
+/*  КАМЕРЫ                                                                 */
+/* ====================================================================== */
+const cameraModal = new bootstrap.Modal(document.getElementById('cameraModal'));
+let editingCameraId = null;
+
+function openCameraModal(data = null) {
+    editingCameraId = data ? data.id : null;
+    document.getElementById('cameraModalTitle').textContent =
+        data ? 'Редактирование камеры' : 'Новая камера';
+
+    document.getElementById('camId').value = data ? data.id : '';
+    document.getElementById('camId').disabled = !!data;
+    document.getElementById('camName').value = data ? data.name : '';
+    document.getElementById('camType').value = data ? data.type : 'ip';
+    document.getElementById('camSource').value = data ? data.source : '';
+    document.getElementById('camWidth').value = data ? data.width : 640;
+    document.getElementById('camHeight').value = data ? data.height : 480;
+    document.getElementById('camFps').value = data ? data.fps : 25;
+    document.getElementById('camEnabled').checked = data ? !!data.enabled : true;
+    document.getElementById('camAutoRecord').checked = data ? !!data.auto_record : false;
+
+    // --- Аналитика (флаги) ---
+    const ana = (data && data.analytics) || {};
+    document.getElementById('anaCamEnabled').checked = !!ana.enabled;
+    document.getElementById('anaDetectObjects').checked = !!ana.detect_objects;
+    document.getElementById('anaDetectPlates').checked = !!ana.detect_plates;
+    document.getElementById('anaDetectFaces').checked = !!ana.detect_faces;
+    document.getElementById('anaDetectMotion').checked = !!ana.detect_motion;
+
+    onAnalyticsToggle();
+
+    const ptz = (data && data.ptz) || {};
+    document.getElementById('camPtzEnabled').checked = !!ptz.enabled;
+    document.getElementById('camPtzIp').value = ptz.ip || '';
+    document.getElementById('camPtzPort').value = ptz.port || 80;
+    document.getElementById('camPtzUser').value = ptz.user || '';
+    document.getElementById('camPtzPass').value = ptz.password || '';
+
+    onCamTypeChange();
+    onPtzToggle();
+    cameraModal.show();
+}
+
+function editCamera(data) {
+    openCameraModal(data);
+}
+
+function onCamTypeChange() {
+    const type = document.getElementById('camType').value;
+    const hint = document.getElementById('camSourceHint');
+    const src = document.getElementById('camSource');
+    if (type === 'analog') {
+        hint.textContent = 'Индекс устройства: Windows — DirectShow; Linux — /dev/videoN';
+        src.placeholder = '0';
+    } else {
+        hint.textContent = 'rtsp://… , http://… или https://…';
+        src.placeholder = 'rtsp://user:pass@192.168.1.10:554/stream1';
+    }
+}
+
+function onPtzToggle() {
+    const on = document.getElementById('camPtzEnabled').checked;
+    ['camPtzIp', 'camPtzPort', 'camPtzUser', 'camPtzPass'].forEach(id => {
+        document.getElementById(id).disabled = !on;
+    });
+}
+
+function onAnalyticsToggle() {
+    const on = document.getElementById('anaCamEnabled').checked;
+    const block = document.getElementById('anaFlagsBlock');
+    const ids = ['anaDetectObjects', 'anaDetectPlates',
+                 'anaDetectFaces', 'anaDetectMotion'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el.disabled && on) {
+            // Не включаем «disabled»-заглушки (лица)
+            return;
+        }
+        el.disabled = !on;
+    });
+    block.style.opacity = on ? '1' : '0.5';
+}
+
+async function saveCamera() {
+    const payload = {
+        id: document.getElementById('camId').value.trim(),
+        name: document.getElementById('camName').value.trim(),
+        type: document.getElementById('camType').value,
+        source: document.getElementById('camSource').value.trim(),
+        width: parseInt(document.getElementById('camWidth').value, 10),
+        height: parseInt(document.getElementById('camHeight').value, 10),
+        fps: parseInt(document.getElementById('camFps').value, 10),
+        enabled: document.getElementById('camEnabled').checked,
+        auto_record: document.getElementById('camAutoRecord').checked,
+        analytics: {
+            enabled:         document.getElementById('anaCamEnabled').checked,
+            detect_objects:  document.getElementById('anaDetectObjects').checked,
+            detect_plates:   document.getElementById('anaDetectPlates').checked,
+            detect_faces:    document.getElementById('anaDetectFaces').checked,
+            detect_motion:   document.getElementById('anaDetectMotion').checked,
+            zones: [],
+        },
+    };
+
+    // Сохраняем существующие zones
+    if (editingCameraId) {
+        try {
+            const list = await apiCall('/api/config/cameras');
+            if (list) {
+                const existing = list.find(c => c.id === editingCameraId);
+                if (existing && existing.analytics && existing.analytics.zones) {
+                    payload.analytics.zones = existing.analytics.zones;
+                }
+            }
+        } catch (_) {}
+    }
+
+    if (document.getElementById('camPtzEnabled').checked) {
+        payload.ptz = {
+            enabled: true,
+            ip: document.getElementById('camPtzIp').value.trim(),
+            port: parseInt(document.getElementById('camPtzPort').value, 10) || 80,
+            user: document.getElementById('camPtzUser').value.trim(),
+            password: document.getElementById('camPtzPass').value,
+        };
+    }
+
+    const url = editingCameraId
+        ? '/api/config/cameras/' + editingCameraId
+        : '/api/config/cameras';
+    const method = editingCameraId ? 'PUT' : 'POST';
+
+    const data = await apiCall(url, {
+        method,
+        body: JSON.stringify(payload),
+    });
+    if (data) {
+        showToast('Камера сохранена', 'success');
+        cameraModal.hide();
+        setTimeout(() => location.reload(), 600);
+    }
+}
+
+async function deleteCamera(id) {
+    if (!confirm(`Удалить камеру "${id}"? Поток будет остановлен, файлы архива останутся.`)) return;
+    const data = await apiCall('/api/config/cameras/' + id, { method: 'DELETE' });
+    if (data) {
+        showToast('Камера удалена', 'success');
+        setTimeout(() => location.reload(), 600);
+    }
+}
+
+/* ====================================================================== */
+/*  АНАЛИТИКА                                                              */
+/* ====================================================================== */
+let _anaStatusTimer = null;
+
+async function loadAnalyticsSettings() {
+    const s = await apiCall('/api/analytics/settings');
+    if (!s) return;
+    document.getElementById('anaManaged').checked = !!s.managed;
+    document.getElementById('anaAutoStart').checked = !!s.auto_start;
+    document.getElementById('anaAutoRestart').checked = !!s.auto_restart;
+    document.getElementById('anaMaxRestarts').value = s.max_restarts_per_hour;
+    document.getElementById('anaTrayNotifications').checked = !!s.tray_notifications;
+    document.getElementById('anaExePath').value = s.exe_path || '';
+    document.getElementById('anaUrl').value = s.url || '';
+}
+
+async function saveAnalyticsSettings() {
+    const payload = {
+        managed: document.getElementById('anaManaged').checked,
+        auto_start: document.getElementById('anaAutoStart').checked,
+        auto_restart: document.getElementById('anaAutoRestart').checked,
+        max_restarts_per_hour: parseInt(
+            document.getElementById('anaMaxRestarts').value, 10
+        ) || 3,
+        tray_notifications: document.getElementById('anaTrayNotifications').checked,
+        exe_path: document.getElementById('anaExePath').value.trim(),
+        url: document.getElementById('anaUrl').value.trim(),
+    };
+    const data = await apiCall('/api/analytics/settings', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+    if (data) {
+        showToast('Настройки Analytics сохранены', 'success');
+        refreshAnalyticsStatus();
+    }
+}
+
+async function anaCheckPath() {
+    const path = document.getElementById('anaExePath').value.trim();
+    const resultEl = document.getElementById('anaPathResult');
+    resultEl.innerHTML = '<span class="text-secondary">Проверяю…</span>';
+
+    const data = await apiCall('/api/analytics/check_path', {
+        method: 'POST',
+        body: JSON.stringify({ exe_path: path }),
+    });
+    if (!data) {
+        resultEl.innerHTML = '<span class="text-danger">Ошибка проверки</span>';
+        return;
+    }
+    if (data.found) {
+        resultEl.innerHTML =
+            `<span class="text-success">✓ Файл найден: ` +
+            `<code>${data.resolved}</code></span>`;
+    } else if (data.candidates && data.candidates.length > 0) {
+        const list = data.candidates.map(c => `<li><code>${c}</code></li>`).join('');
+        resultEl.innerHTML =
+            `<span class="text-warning">Не найден, но есть кандидаты:</span>` +
+            `<ul class="small mb-0">${list}</ul>`;
+    } else {
+        resultEl.innerHTML =
+            `<span class="text-danger">✗ Файл не найден.</span>`;
+    }
+}
+
+async function refreshAnalyticsStatus() {
+    const s = await apiCall('/api/analytics/status');
+    if (!s) return;
+
+    const stateMap = {
+        stopped:  { text: 'Остановлен', badge: 'bg-secondary' },
+        starting: { text: 'Запускается', badge: 'bg-info text-dark' },
+        running:  { text: 'Работает',   badge: 'bg-success' },
+        stopping: { text: 'Останавливается', badge: 'bg-warning text-dark' },
+        error:    { text: 'Ошибка',     badge: 'bg-danger' },
+    };
+    const meta = stateMap[s.state] || { text: s.state, badge: 'bg-secondary' };
+
+    const badge = document.getElementById('anaStatusBadge');
+    badge.className = 'badge ' + meta.badge;
+    badge.textContent = meta.text;
+
+    document.getElementById('anaStatusState').textContent = meta.text;
+    document.getElementById('anaStatusPid').textContent = s.pid || '—';
+
+    if (s.uptime_sec > 0) {
+        const h = Math.floor(s.uptime_sec / 3600);
+        const m = Math.floor((s.uptime_sec % 3600) / 60);
+        const sec = s.uptime_sec % 60;
+        document.getElementById('anaStatusUptime').textContent =
+            h > 0 ? `${h}ч ${m}м` : (m > 0 ? `${m}м ${sec}с` : `${sec}с`);
+    } else {
+        document.getElementById('anaStatusUptime').textContent = '—';
+    }
+    document.getElementById('anaStatusRestarts').textContent =
+        `${s.restarts_last_hour} / ${document.getElementById('anaMaxRestarts').value || 3}`;
+
+    const errBox = document.getElementById('anaLastErrorBox');
+    const errText = document.getElementById('anaLastError');
+    if (s.last_error) {
+        errBox.classList.remove('d-none');
+        errText.textContent = s.last_error;
+    } else {
+        errBox.classList.add('d-none');
+    }
+}
+
+async function anaStart() {
+    const data = await apiCall('/api/analytics/start', { method: 'POST' });
+    if (data) {
+        showToast(data.ok ? 'Analytics запускается…' : 'Не удалось запустить',
+                  data.ok ? 'info' : 'danger', 5000);
+        refreshAnalyticsStatus();
+    }
+}
+
+async function anaStop() {
+    if (!confirm('Остановить модуль аналитики?')) return;
+    const data = await apiCall('/api/analytics/stop', { method: 'POST' });
+    if (data) {
+        showToast('Analytics остановлен', 'success');
+        refreshAnalyticsStatus();
+    }
+}
+
+async function anaRestart() {
+    if (!confirm('Перезапустить модуль аналитики?')) return;
+    const data = await apiCall('/api/analytics/restart', { method: 'POST' });
+    if (data) {
+        showToast('Analytics перезапускается…', 'info', 5000);
+        refreshAnalyticsStatus();
+    }
+}
+
+function openAnalyticsUI() {
+    const url = document.getElementById('anaUrl').value.trim() ||
+                'http://localhost:8100';
+    window.open(url, '_blank');
+}
+
+function startAnalyticsPolling() {
+    if (_anaStatusTimer) return;
+    _anaStatusTimer = setInterval(refreshAnalyticsStatus, 5000);
+}
+
+function stopAnalyticsPolling() {
+    if (_anaStatusTimer) {
+        clearInterval(_anaStatusTimer);
+        _anaStatusTimer = null;
+    }
+}
+
+/* ====================================================================== */
+/*  ХРАНИЛИЩЕ                                                              */
+/* ====================================================================== */
+async function loadStorageInfo() {
+    const info = await apiCall('/api/storage/info');
+    if (!info) return;
+    document.getElementById('storageCurrentDir').innerHTML =
+        `<code>${info.recordings_dir || '—'}</code>`;
+    document.getElementById('storageArchiveSize').textContent =
+        info.archive_gb != null ? `${info.archive_gb} ГБ` : '—';
+    document.getElementById('storageFreeSpace').textContent =
+        info.disk_free_gb != null
+            ? `${info.disk_free_gb} ГБ (${info.disk_used_percent || 0}% занято)`
+            : '—';
+    if (info.recordings_dir) {
+        document.getElementById('storagePath').value = info.recordings_dir;
+    }
+    const histEl = document.getElementById('storageHistory');
+    const hist = info.dirs_history || [];
+    if (hist.length === 0) {
+        histEl.innerHTML = '<span class="text-secondary">пусто</span>';
+    } else {
+        histEl.innerHTML = hist.map(d =>
+            `<div class="text-truncate text-secondary">` +
+            `<i class="bi bi-archive"></i> <code>${d}</code></div>`
+        ).join('');
+    }
+}
+
+async function storageCheckPath() {
+    const path = document.getElementById('storagePath').value.trim();
+    const el = document.getElementById('storagePathResult');
+    el.innerHTML = '<span class="text-secondary">Проверяю…</span>';
+    const data = await apiCall('/api/storage/check_path', {
+        method: 'POST',
+        body: JSON.stringify({ path }),
+    });
+    if (!data) {
+        el.innerHTML = '<span class="text-danger">Ошибка проверки</span>';
+        return;
+    }
+    if (data.ok) {
+        let extra = '';
+        if (data.created) extra += ' (папка создана)';
+        if (data.disk_free_gb) extra += ` · свободно ${data.disk_free_gb} ГБ`;
+        el.innerHTML =
+            `<span class="text-success">✓ Доступно: <code>${data.path}</code>${extra}</span>`;
+    } else {
+        el.innerHTML = `<span class="text-danger">✗ ${data.error || 'Ошибка'}</span>`;
+    }
+}
+
+async function storageSetPath() {
+    const path = document.getElementById('storagePath').value.trim();
+    if (!path) return showToast('Укажите путь', 'warning');
+    if (!confirm('Сменить папку записей? Камеры перезапустятся.')) return;
+    const data = await apiCall('/api/storage/set_path', {
+        method: 'POST',
+        body: JSON.stringify({ path }),
+    });
+    if (data && data.ok) {
+        showToast('Папка записей изменена', 'success');
+        loadStorageInfo();
+    }
+}
+
+async function storageForgetHistory() {
+    if (!confirm('Очистить историю папок?')) return;
+    const data = await apiCall('/api/storage/forget_history', { method: 'POST' });
+    if (data) {
+        showToast('История очищена', 'success');
+        loadStorageInfo();
+    }
+}
+
+/* ====================================================================== */
+/*  ВНЕШНИЙ ВИД / СИСТЕМА                                                  */
+/* ====================================================================== */
+async function loadUiSettings() {
+    const s = await apiCall('/api/settings');
+    if (!s) return;
+    document.getElementById('setTheme').value = s['ui.theme'] || 'dark';
+    document.getElementById('setAccent').value = s['ui.accent'] || '#0d6efd';
+    document.getElementById('setTileColumns').value = s['ui.tile_columns'] || '4';
+    document.getElementById('setDefaultPage').value = s['ui.default_page'] || 'index';
+    document.getElementById('setShowFps').checked = s['ui.show_fps'] === '1';
+    document.getElementById('setArchiveDays').value = s['system.max_archive_days'] || '0';
+    const q = document.getElementById('setMjpegQuality');
+    q.value = s['system.mjpeg_quality'] || '80';
+    document.getElementById('mjpegQualityVal').textContent = q.value;
+}
+
+document.getElementById('setMjpegQuality').addEventListener('input', (e) => {
+    document.getElementById('mjpegQualityVal').textContent = e.target.value;
+});
+
+async function saveUiSettings() {
+    const data = await apiCall('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify({
+            'ui.theme': document.getElementById('setTheme').value,
+            'ui.accent': document.getElementById('setAccent').value,
+            'ui.tile_columns': document.getElementById('setTileColumns').value,
+            'ui.default_page': document.getElementById('setDefaultPage').value,
+            'ui.show_fps': document.getElementById('setShowFps').checked ? '1' : '0',
+        }),
+    });
+    if (data) {
+        showToast('Настройки сохранены', 'success');
+        setTimeout(() => location.reload(), 600);
+    }
+}
+
+async function saveSystemSettings() {
+    const data = await apiCall('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify({
+            'system.max_archive_days': document.getElementById('setArchiveDays').value,
+            'system.mjpeg_quality': document.getElementById('setMjpegQuality').value,
+        }),
+    });
+    if (data) showToast('Системные настройки сохранены', 'success');
+}
+
+/* ====================================================================== */
+/*  ИНИЦИАЛИЗАЦИЯ                                                          */
+/* ====================================================================== */
+loadUiSettings();
+loadAnalyticsSettings().then(refreshAnalyticsStatus);
+loadStorageInfo();
+
+document.getElementById('tabAnalyticsBtn').addEventListener('shown.bs.tab', () => {
+    refreshAnalyticsStatus();
+    startAnalyticsPolling();
+});
+document.getElementById('tabAnalyticsBtn').addEventListener('hidden.bs.tab', () => {
+    stopAnalyticsPolling();
+});
+</script>
+{% endblock %}

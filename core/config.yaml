@@ -1,0 +1,65 @@
+server:
+  host: 0.0.0.0
+  port: 8000
+  secret_key: change-this-to-a-random-string
+  recordings_dir: recordings
+  recordings_dirs_history: []
+  segment_duration: 3600
+auth:
+  default_user: admin
+  default_password: admin
+branding:
+  product_name: VHS
+  company: VHS AG
+  author: Andrew Geben
+  copyright_holder: Andrew Geben
+  copyright_year: ''
+  version: 1.4.0
+  show_version: true
+analytics:
+  api_token: change-this-analytics-token
+  managed: true
+  exe_path: ..\analytics\VHS-Analytics.exe
+  url: http://localhost:8100
+  auto_start: false
+  auto_restart: true
+  max_restarts_per_hour: 3
+  tray_notifications: true
+cameras:
+- id: analog_1
+  name: Аналоговая камера 1
+  type: analog
+  source: 0
+  enabled: true
+  fps: 25
+  width: 640
+  height: 480
+  auto_record: false
+  analytics:
+    enabled: true
+    detect_objects: false
+    detect_plates: true
+    detect_faces: false
+    detect_motion: false
+    zones:
+    - h: 320
+      name: Зона входа
+      w: 440
+      x: 100
+      y: 80
+- id: ip_1
+  name: IP камера — вход
+  type: ip
+  source: rtsp://andrew:michel73@192.168.1.87:554/stream1
+  enabled: true
+  fps: 25
+  width: 1280
+  height: 720
+  auto_record: false
+  analytics:
+    enabled: false
+    detect_objects: false
+    detect_plates: false
+    detect_faces: false
+    detect_motion: false
+    zones: []

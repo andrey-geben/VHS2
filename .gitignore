@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller
+build/
+dist/
+dist_old/
+VHS-deploy/
+*.manifest
+*.spec.bak
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Данные приложения
+*.db
+*.log
+recordings/
+snapshots/
+
+# Мусор
+*.zip
+project_tree.txt
+*.lnk
+test_data/
+debug_*.jpg
+alpr_*.jpg
+fastalpr_*.jpg
+
+# OS
+Thumbs.db
+.DS_Store
